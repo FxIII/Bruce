@@ -17,6 +17,7 @@
 #include "menu_items/OthersMenu.h"
 #include "menu_items/RFIDMenu.h"
 #include "menu_items/RFMenu.h"
+#include "menu_items/ForthMenu.h"
 #include "menu_items/ScriptsMenu.h"
 #include "menu_items/WifiMenu.h"
 class MainMenu {
@@ -33,6 +34,7 @@ public:
     OthersMenu othersMenu;
     RFIDMenu rfidMenu;
     RFMenu rfMenu;
+    ForthMenu forthMenu;
     ScriptsMenu scriptsMenu;
     WifiMenu wifiMenu;
 #if !defined(LITE_VERSION)
