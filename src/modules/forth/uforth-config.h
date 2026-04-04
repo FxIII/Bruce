@@ -12,7 +12,7 @@
 #define FIXED_PT_PLACES     6
 #define FIXED_PT_MULT(x)    (x*(1000000))
 
-#define TOTAL_RAM_CELLS     256     /* 256 * 8 bytes = 2KB */
+#define TOTAL_RAM_CELLS     4096    /* 4096 * 8 bytes = 32KB (PSRAM) */
 #define PAD_SIZE            128
 #define TIB_SIZE            PAD_SIZE
 

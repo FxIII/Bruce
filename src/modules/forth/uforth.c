@@ -68,7 +68,7 @@ INLINE void dpush32(const uint32_t w2) { dpush(w2); }
 #define IMMEDIATE_BIT (1<<7)
 #define PRIM_BIT      (1<<6)
 
-DCELL uforth_ram[TOTAL_RAM_CELLS];
+DCELL uforth_ram[TOTAL_RAM_CELLS] __attribute__((section(".ext_ram.bss")));
 
 enum {
     LIT=1, DLIT, ABORT, DEF, IMMEDIATE, URAM_BASE_ADDR, PICK, RPICK,
