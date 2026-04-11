@@ -4,6 +4,8 @@
 #include "natives/natives.h"
 
 #include <Arduino.h>
+#include <deque>
+#include <string>
 #include <globals.h>
 #include "core/display.h"
 #include "core/mykeyboard.h"
@@ -23,7 +25,16 @@ static ForthTerminal _term;
 
 // Current input line
 static String _input;
-static int    _inputScroll = 0;
+static int    _inputCursor   = 0;  // insert position (0..length)
+static int    _inputScroll   = 0;  // first visible char index
+static int    _nInputLines   = 1;  // 1 or 2, tracks current terminal split
+static bool   _scrollMode    = false;  // opt toggle: hide input, arrows scroll output
+
+// Input history
+#define HISTORY_MAX 16
+static std::deque<std::string> _history;   // front = most recent
+static int                     _historyIdx = -1;  // -1 = not browsing; 0 = most recent
+static String                  _inputSaved;        // line saved when entering history
 
 // Source log: accumulates `: word ... ;` lines so `store` can replay them
 #define MAX_SOURCE_LOG 64
@@ -39,28 +50,85 @@ static void _appendOutput(const char *s) {
 
 // ─── Input line ──────────────────────────────────────────────────────────────
 
-static void _inputScrollToEnd() {
-    int avail = tftWidth / (6 * INPUT_FONT) - 1;
-    _inputScroll = max(0, (int)_input.length() - avail);
+static int _inputAvail()  { return tftWidth / (6 * INPUT_FONT) - 1; }
+static int _inputNeededLines() { return (_input.length() > (size_t)_inputAvail()) ? 2 : 1; }
+
+// Adjust scroll so cursor stays visible across 1 or 2 lines
+static void _scrollToCursor() {
+    int avail  = _inputAvail();
+    int window = avail * _inputNeededLines();
+    if (_inputCursor < _inputScroll)           _inputScroll = _inputCursor;
+    if (_inputCursor >= _inputScroll + window) _inputScroll = _inputCursor - window + 1;
+    if (_inputScroll < 0)                      _inputScroll = 0;
+}
+
+// Load a history entry into _input (0 = most recent)
+static void _historyLoad(int idx) {
+    _input = String(_history[idx].c_str());
+    _inputCursor = _input.length();
+    _scrollToCursor();
+}
+
+// Push a line into history (front = most recent, max HISTORY_MAX)
+static void _historyPush(const String &line) {
+    if (line.length() == 0) return;
+    _history.push_front(std::string(line.c_str()));
+    if (_history.size() > HISTORY_MAX) _history.pop_back();
 }
 
 static void _drawInput() {
-    int cols   = tftWidth / (6 * INPUT_FONT);
-    int inputY = tftHeight - INPUT_H;
-    int avail  = cols - 1;
+    int avail  = _inputAvail();
+    int nLines = _inputNeededLines();
+    int totalH = INPUT_H * nLines;
+    int inputY = tftHeight - totalH;
 
-    int maxScroll = max(0, (int)_input.length() - avail);
+    // Clamp scroll
+    int window    = avail * nLines;
+    int maxScroll = max(0, (int)_input.length() - window);
     if (_inputScroll > maxScroll) _inputScroll = maxScroll;
     if (_inputScroll < 0)         _inputScroll = 0;
 
-    char prompt = (_inputScroll > 0) ? '$' : '>';
-    String visible = _input.substring(_inputScroll, _inputScroll + avail);
-    while ((int)visible.length() < avail) visible += ' ';
+
+    // If line count changed, re-render terminal to clear/restore the affected area
+    if (nLines != _nInputLines) {
+        _nInputLines = nLines;
+        _term.render();
+    }
+
+    // Fill padding pixels below each line (INPUT_H - text height = 4px)
+    int pad = INPUT_H - 8 * INPUT_FONT;
+    for (int l = 0; l < nLines; l++)
+        tft.fillRect(0, inputY + l * INPUT_H + 8 * INPUT_FONT, tftWidth, pad, bruceConfig.priColor);
 
     tft.setTextSize(INPUT_FONT);
     tft.setTextColor(bruceConfig.bgColor, bruceConfig.priColor);
+
+    // Line 1
+    char prompt1 = (_inputScroll > 0) ? '$' : '>';
+    String vis1  = _input.substring(_inputScroll, _inputScroll + avail);
+    while ((int)vis1.length() < avail) vis1 += ' ';
     tft.setCursor(0, inputY);
-    tft.print(String(prompt) + visible);
+    tft.print(String(prompt1) + vis1);
+
+    // Line 2 (if needed)
+    if (nLines == 2) {
+        int start2    = _inputScroll + avail;
+        bool overflow = ((int)_input.length() > start2 + avail);
+        char prompt2  = overflow ? '$' : ' ';
+        String vis2   = _input.substring(start2, start2 + avail);
+        while ((int)vis2.length() < avail) vis2 += ' ';
+        tft.setCursor(0, inputY + INPUT_H);
+        tft.print(String(prompt2) + vis2);
+    }
+
+    // Cursor: 1px vertical line
+    int charW  = 6 * INPUT_FONT;
+    int relPos = _inputCursor - _inputScroll;
+    int cLine, cCol;
+    if (relPos < avail) { cLine = 0; cCol = 1 + relPos; }
+    else                { cLine = 1; cCol = 1 + (relPos - avail); }
+    tft.drawFastVLine(cCol * charW, inputY + cLine * INPUT_H + 1, INPUT_H - 2, bruceConfig.bgColor);
+
     tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
     tft.setTextSize(1);
 }
@@ -214,7 +282,11 @@ static struct dict _dictBuf;
 void forthREPL() {
     // Reset state on each entry
     _input = "";
+    _inputCursor = 0;
     _inputScroll = 0;
+    _nInputLines = 1;
+    _scrollMode  = false;
+    _historyIdx  = -1;
     _sourceLogCount = 0;
 
     // Allocate dict once, reinitialize on each entry
@@ -246,40 +318,75 @@ void forthREPL() {
     while (true) {
         keyStroke ks = _getKeyPress();
 
-        if (!ks.pressed) { delay(20); continue; }
+        if (!ks.pressed) { continue; }
 
         if (ks.exit_key && !ks.enter) break;
 
-        // Arrow keys: scroll output
+        // opt (gui) → toggle scroll mode
+        if (ks.gui) {
+            _scrollMode = !_scrollMode;
+            if (_scrollMode) {
+                // hide input area
+                int totalH = INPUT_H * _nInputLines;
+                tft.fillRect(0, tftHeight - totalH, tftWidth, totalH, bruceConfig.bgColor);
+            } else {
+                _drawInput();
+            }
+            continue;
+        }
+
+        if (_scrollMode) {
+            if (!ks.word.empty()) {
+                char c = ks.word[0];
+                if (c == (char)0xDA || c == ';') { _term.scrollUp();   _term.render(); }
+                if (c == (char)0xD9 || c == '.') { _term.scrollDown(); _term.render(); }
+            }
+            continue;
+        }
+
+        // Arrow keys
         if (!ks.word.empty()) {
             char c = ks.word[0];
-            if (c == (char)0xDA) { // up
-                _term.scrollUp();
-                _term.render();
-                _drawInput();
+            if (c == (char)0xDA) { // up → history back
+                if (!_history.empty()) {
+                    if (_historyIdx == -1) { _inputSaved = _input; _historyIdx = 0; }
+                    else if (_historyIdx < (int)_history.size() - 1) _historyIdx++;
+                    _historyLoad(_historyIdx);
+                    _drawInput();
+                }
                 continue;
             }
-            if (c == (char)0xD9) { // down
-                _term.scrollDown();
-                _term.render();
-                _drawInput();
+            if (c == (char)0xD9) { // down → history forward
+                if (_historyIdx >= 0) {
+                    if (_historyIdx == 0) {
+                        _historyIdx = -1;
+                        _input = _inputSaved;
+                        _inputCursor = _input.length();
+                        _scrollToCursor();
+                    } else {
+                        _historyIdx--;
+                        _historyLoad(_historyIdx);
+                    }
+                    _drawInput();
+                }
                 continue;
             }
-            if (c == (char)0xD8) { // left
-                _inputScroll--;
-                _drawInput();
+            if (c == (char)0xD8) { // left → move cursor
+                if (_inputCursor > 0) { _inputCursor--; _scrollToCursor(); _drawInput(); }
                 continue;
             }
-            if (c == (char)0xD7) { // right
-                _inputScroll++;
-                _drawInput();
+            if (c == (char)0xD7) { // right → move cursor
+                if (_inputCursor < (int)_input.length()) { _inputCursor++; _scrollToCursor(); _drawInput(); }
                 continue;
             }
         }
 
         if (ks.enter) {
             String line = _input;
+            _historyPush(line);
+            _historyIdx = -1;
             _input = "";
+            _inputCursor = 0;
             _inputScroll = 0;
 
             _appendOutput("> ");
@@ -311,15 +418,17 @@ void forthREPL() {
                     uforth_abort();
                 }
             }
+            _term.scrollToBottom();
             _term.render();
             _drawInput();
             continue;
         }
 
         if (ks.del) {
-            if (_input.length() > 0) {
-                _input.remove(_input.length() - 1);
-                _inputScrollToEnd();
+            if (_inputCursor > 0) {
+                _input.remove(_inputCursor - 1, 1);
+                _inputCursor--;
+                _scrollToCursor();
                 _drawInput();
             }
             continue;
@@ -327,9 +436,12 @@ void forthREPL() {
 
         if (!ks.word.empty()) {
             for (char c : ks.word) {
-                if (isPrintable(c)) _input += c;
+                if (isPrintable(c)) {
+                    _input = _input.substring(0, _inputCursor) + c + _input.substring(_inputCursor);
+                    _inputCursor++;
+                }
             }
-            _inputScrollToEnd();
+            _scrollToCursor();
             _drawInput();
         }
     }

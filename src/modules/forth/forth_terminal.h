@@ -13,6 +13,7 @@ public:
     void clear();
     void scrollUp();
     void scrollDown();
+    void scrollToBottom();
     void render();
 
 private:

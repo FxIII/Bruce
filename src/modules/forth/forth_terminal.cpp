@@ -85,6 +85,10 @@ void ForthTerminal::scrollDown() {
     if (_scrollOffset > 0) _scrollOffset--;
 }
 
+void ForthTerminal::scrollToBottom() {
+    _scrollOffset = 0;
+}
+
 void ForthTerminal::render() {
     tft.fillRect(_x, _y, _w, _h, bruceConfig.bgColor);
     tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
