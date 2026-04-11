@@ -1,6 +1,7 @@
 #include "forth_repl.h"
 #include "forth_terminal.h"
 #include "uforth.h"
+#include "natives/natives.h"
 
 #include <Arduino.h>
 #include <globals.h>
@@ -22,6 +23,7 @@ static ForthTerminal _term;
 
 // Current input line
 static String _input;
+static int    _inputScroll = 0;
 
 // Source log: accumulates `: word ... ;` lines so `store` can replay them
 #define MAX_SOURCE_LOG 64
@@ -37,80 +39,90 @@ static void _appendOutput(const char *s) {
 
 // ─── Input line ──────────────────────────────────────────────────────────────
 
+static void _inputScrollToEnd() {
+    int avail = tftWidth / (6 * INPUT_FONT) - 1;
+    _inputScroll = max(0, (int)_input.length() - avail);
+}
+
 static void _drawInput() {
-    int cols  = tftWidth / (6 * INPUT_FONT);
+    int cols   = tftWidth / (6 * INPUT_FONT);
     int inputY = tftHeight - INPUT_H;
+    int avail  = cols - 1;
+
+    int maxScroll = max(0, (int)_input.length() - avail);
+    if (_inputScroll > maxScroll) _inputScroll = maxScroll;
+    if (_inputScroll < 0)         _inputScroll = 0;
+
+    char prompt = (_inputScroll > 0) ? '$' : '>';
+    String visible = _input.substring(_inputScroll, _inputScroll + avail);
+    while ((int)visible.length() < avail) visible += ' ';
+
     tft.setTextSize(INPUT_FONT);
     tft.setTextColor(bruceConfig.bgColor, bruceConfig.priColor);
-    String row = "> " + _input;
-    while ((int)row.length() < cols) row += ' ';
-    row = row.substring(0, cols);
     tft.setCursor(0, inputY);
-    tft.print(row);
+    tft.print(String(prompt) + visible);
     tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
     tft.setTextSize(1);
 }
 
 // ─── c_handle — called by uForth `cf` primitive ───────────────────────────────
 
-extern "C" uforth_stat c_handle(void) {
-    DCELL cmd = dpop();
-    char  buf[24];
+// ─── Native function implementations ─────────────────────────────────────────
 
-    switch (cmd) {
-    case 1: { // emit  ( c -- )
-        char c = (char)dpop();
-        char s[2] = {c, '\0'};
-        _appendOutput(s);
-        break;
-    }
-    case 2: // cr  ( -- )
-        _appendOutput("\n");
-        break;
+static void _fn_emit() {
+    char c = (char)dpop();
+    char s[2] = {c, '\0'};
+    _appendOutput(s);
+}
 
-    case 3: { // .  ( n -- )  print number + space
-        DCELL n = dpop();
-        snprintf(buf, sizeof(buf), "%lld ", (long long)n);
-        _appendOutput(buf);
-        break;
-    }
-    case 4: // cls  ( -- )
-        _term.clear();
-        _term.render();
-        break;
+static void _fn_cr() {
+    _appendOutput("\n");
+}
 
-    case 5: { // words  ( -- )  print all word names
-        _appendOutput("\n");
-        CELL idx = dict->last_word_idx;
-        while (idx) {
-            uint8_t flags = (uint8_t)uforth_dict[idx + 1];
-            uint8_t len   = flags & 0x3F;
-            if (len > 0 && len < 63) {
-                char name[64];
-                memcpy(name, (char *)(uforth_dict + idx + 2), len);
-                name[len] = '\0';
-                _appendOutput(name);
-                _appendOutput(" ");
-            }
-            idx = uforth_dict[idx];
+static void _fn_dot() {
+    char buf[24];
+    DCELL n = dpop();
+    snprintf(buf, sizeof(buf), "%lld ", (long long)n);
+    _appendOutput(buf);
+}
+
+static void _fn_cls() {
+    _term.clear();
+    _term.render();
+}
+
+static void _fn_words() {
+    _appendOutput("\n");
+    CELL idx = dict->last_word_idx;
+    while (idx) {
+        uint8_t flags = (uint8_t)uforth_dict[idx + 1];
+        uint8_t len   = flags & 0x3F;
+        if (len > 0 && len < 63) {
+            char name[64];
+            memcpy(name, (char *)(uforth_dict + idx + 2), len);
+            name[len] = '\0';
+            _appendOutput(name);
+            _appendOutput(" ");
         }
-        _appendOutput("\n");
-        break;
+        idx = uforth_dict[idx];
     }
-    default:
-        return E_NOT_A_WORD;
-    }
-    return UFORTH_OK;
+    _appendOutput("\n");
+}
+
+// ─── c_handle — called by uForth `cf` primitive ───────────────────────────────
+
+extern "C" uforth_stat c_handle(void) {
+    return forth_dispatch((CELL)dpop());
 }
 
 // ─── Core I/O words ───────────────────────────────────────────────────────────
 
 static void _loadCorePrims() {
-    uforth_interpret(": emit  1 cf ;");
-    uforth_interpret(": cr    2 cf ;");
-    uforth_interpret(": .     3 cf ;");
-    uforth_interpret(": cls   4 cf ;");
-    uforth_interpret(": words 5 cf ;");
+    forth_register("emit",  _fn_emit);
+    forth_register("cr",    _fn_cr);
+    forth_register(".",     _fn_dot);
+    forth_register("cls",   _fn_cls);
+    forth_register("words", _fn_words);
 }
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
@@ -202,6 +214,7 @@ static struct dict _dictBuf;
 void forthREPL() {
     // Reset state on each entry
     _input = "";
+    _inputScroll = 0;
     _sourceLogCount = 0;
 
     // Allocate dict once, reinitialize on each entry
@@ -219,7 +232,10 @@ void forthREPL() {
 
     uforth_init();
     uforth_load_prims();
+    forth_define_words();
+    forth_natives_reset();
     _loadCorePrims();
+    forth_register_all();
     _loadInitFs();
 
     _appendOutput("uForth 1.2  type 'bye' to exit\n");
@@ -249,11 +265,22 @@ void forthREPL() {
                 _drawInput();
                 continue;
             }
+            if (c == (char)0xD8) { // left
+                _inputScroll--;
+                _drawInput();
+                continue;
+            }
+            if (c == (char)0xD7) { // right
+                _inputScroll++;
+                _drawInput();
+                continue;
+            }
         }
 
         if (ks.enter) {
             String line = _input;
             _input = "";
+            _inputScroll = 0;
 
             _appendOutput("> ");
             _appendOutput(line.c_str());
@@ -292,6 +319,7 @@ void forthREPL() {
         if (ks.del) {
             if (_input.length() > 0) {
                 _input.remove(_input.length() - 1);
+                _inputScrollToEnd();
                 _drawInput();
             }
             continue;
@@ -301,6 +329,7 @@ void forthREPL() {
             for (char c : ks.word) {
                 if (isPrintable(c)) _input += c;
             }
+            _inputScrollToEnd();
             _drawInput();
         }
     }

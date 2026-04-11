@@ -64,7 +64,8 @@ extern struct dict *dict;
 extern DCELL uforth_ram[];
 
 typedef enum { NO_ABORT=0, ABORT_CTRL_C=1, ABORT_NAW=2,
-     ABORT_ILLEGAL=3, ABORT_WORD=4, ABORT_STACKOVER=5 } abort_t;
+     ABORT_ILLEGAL=3, ABORT_WORD=4, ABORT_STACKOVER=5,
+     ABORT_STACKUNDER=6 } abort_t;
 
 extern abort_t _uforth_abort_request;
 
@@ -103,6 +104,8 @@ INLINE DCELL rpick(const DCELL n);
 extern void uforth_init(void);
 extern void uforth_load_prims(void);
 extern void uforth_abort(void);
+extern void forth_define_native(const char *name, CELL id);
+extern void forth_define_words(void);
 extern uforth_stat uforth_interpret(const char*);
 extern uforth_stat c_handle(void);
 char* uforth_next_word(void);

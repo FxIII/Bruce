@@ -44,21 +44,34 @@ struct uforth_iram *uforth_iram;
 struct uforth_uram *uforth_uram;
 
 INLINE void dpush(const DCELL w) {
-    if (uforth_uram->didx == (uforth_uram->dsize+uforth_uram->rsize-1)) {
-        uforth_abort_request(ABORT_STACKOVER);
-        return;
-    } else uforth_uram->ds[++uforth_uram->didx] = w;
-}
-INLINE DCELL dpop(void) { return uforth_uram->ds[uforth_uram->didx--]; }
-INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
-INLINE void rpush(const DCELL w) {
-    if (uforth_uram->ridx == (uforth_uram->dsize)) {
+    if (uforth_uram->didx >= uforth_uram->ridx - 1) {
         uforth_abort_request(ABORT_STACKOVER);
         return;
     }
-    else uforth_uram->ds[--uforth_uram->ridx] = w;
+    uforth_uram->ds[++uforth_uram->didx] = w;
 }
-INLINE DCELL rpop(void) { return uforth_uram->ds[uforth_uram->ridx++]; }
+INLINE DCELL dpop(void) {
+    if (uforth_uram->didx < 0) {
+        uforth_abort_request(ABORT_STACKUNDER);
+        return 0;
+    }
+    return uforth_uram->ds[uforth_uram->didx--];
+}
+INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
+INLINE void rpush(const DCELL w) {
+    if (uforth_uram->ridx <= uforth_uram->didx + 1) {
+        uforth_abort_request(ABORT_STACKOVER);
+        return;
+    }
+    uforth_uram->ds[--uforth_uram->ridx] = w;
+}
+INLINE DCELL rpop(void) {
+    if (uforth_uram->ridx >= uforth_uram->dsize + uforth_uram->rsize) {
+        uforth_abort_request(ABORT_STACKUNDER);
+        return 0;
+    }
+    return uforth_uram->ds[uforth_uram->ridx++];
+}
 INLINE DCELL rpick(const DCELL n) { return uforth_uram->ds[uforth_uram->ridx+n]; }
 
 INLINE uint32_t dpop32(void) { return dpop(); }
@@ -148,6 +161,218 @@ void store_prim(const char* str, CELL val) {
     dict_append(val);
     dict_append(EXIT);
     dict_write((dict->last_word_idx+1), uforth_dict[dict->last_word_idx+1]|PRIM_BIT);
+}
+
+void forth_define_native(const char *name, CELL id) {
+    make_word(name, strlen(name));
+    dict_append(LIT);
+    dict_append(id);
+    dict_append(CALLC);
+    dict_append(EXIT);
+}
+
+// ─── Standard Forth words defined directly in the dict ───────────────────────
+// Must be called after uforth_load_prims().
+
+void forth_define_words(void) {
+
+    // ── Stack ────────────────────────────────────────────────────────────────
+
+    make_word("dup", 3);                        // ( a -- a a )
+    dict_append(LIT);  dict_append(0);
+    dict_append(PICK);
+    dict_append(EXIT);
+
+    make_word("over", 4);                       // ( a b -- a b a )
+    dict_append(LIT);  dict_append(1);
+    dict_append(PICK);
+    dict_append(EXIT);
+
+    make_word("swap", 4);                       // ( a b -- b a )
+    dict_append(RPUSH); dict_append(RPUSH);
+    dict_append(LIT);  dict_append(1);  dict_append(RPICK);
+    dict_append(RPOP);  dict_append(RPOP);  dict_append(DROP);
+    dict_append(EXIT);
+
+    make_word("rot", 3);                        // ( a b c -- b c a )
+    dict_append(RPUSH); dict_append(RPUSH); dict_append(RPUSH);
+    dict_append(LIT);  dict_append(2);  dict_append(RPICK);
+    dict_append(LIT);  dict_append(1);  dict_append(RPICK);
+    dict_append(RPOP);  dict_append(RPOP);  dict_append(RPOP);
+    dict_append(DROP);  dict_append(DROP);
+    dict_append(EXIT);
+
+    make_word("nip", 3);                        // ( a b -- b )
+    // inline swap then drop
+    dict_append(RPUSH); dict_append(RPUSH);
+    dict_append(LIT);  dict_append(1);  dict_append(RPICK);
+    dict_append(RPOP);  dict_append(RPOP);  dict_append(DROP);
+    dict_append(DROP);
+    dict_append(EXIT);
+
+    make_word("2dup", 4);                       // ( a b -- a b a b )
+    dict_append(LIT);  dict_append(1);  dict_append(PICK);
+    dict_append(LIT);  dict_append(1);  dict_append(PICK);
+    dict_append(EXIT);
+
+    make_word("2drop", 5);                      // ( a b -- )
+    dict_append(DROP);  dict_append(DROP);
+    dict_append(EXIT);
+
+    // ── Arithmetic ───────────────────────────────────────────────────────────
+
+    make_word("1+", 2);
+    dict_append(LIT);  dict_append(1);  dict_append(ADD);
+    dict_append(EXIT);
+
+    make_word("1-", 2);
+    dict_append(LIT);  dict_append(1);  dict_append(SUB);
+    dict_append(EXIT);
+
+    make_word("negate", 6);                     // two's complement: ~n + 1
+    dict_append(INVERT);
+    dict_append(LIT);  dict_append(1);  dict_append(ADD);
+    dict_append(EXIT);
+
+    make_word("not", 3);
+    dict_append(EQ_ZERO);
+    dict_append(EXIT);
+
+    // ── Comparison ───────────────────────────────────────────────────────────
+
+    make_word("=", 1);
+    dict_append(SUB);  dict_append(EQ_ZERO);
+    dict_append(EXIT);
+
+    make_word("<>", 2);
+    dict_append(SUB);  dict_append(EQ_ZERO);  dict_append(INVERT);
+    dict_append(EXIT);
+
+    make_word("<", 1);
+    dict_append(SUB);  dict_append(LESS_THAN_ZERO);
+    dict_append(EXIT);
+
+    make_word(">", 1);                          // inline swap then <
+    dict_append(RPUSH); dict_append(RPUSH);
+    dict_append(LIT);  dict_append(1);  dict_append(RPICK);
+    dict_append(RPOP);  dict_append(RPOP);  dict_append(DROP);
+    dict_append(SUB);  dict_append(LESS_THAN_ZERO);
+    dict_append(EXIT);
+
+    make_word("0>", 2);                         // negate then 0<
+    dict_append(INVERT);
+    dict_append(LIT);  dict_append(1);  dict_append(ADD);
+    dict_append(LESS_THAN_ZERO);
+    dict_append(EXIT);
+
+    make_word(">=", 2);                         // not <
+    dict_append(SUB);  dict_append(LESS_THAN_ZERO);  dict_append(EQ_ZERO);
+    dict_append(EXIT);
+
+    make_word("<=", 2);                         // swap >=  (inline)
+    dict_append(RPUSH); dict_append(RPUSH);
+    dict_append(LIT);  dict_append(1);  dict_append(RPICK);
+    dict_append(RPOP);  dict_append(RPOP);  dict_append(DROP);
+    dict_append(SUB);  dict_append(LESS_THAN_ZERO);  dict_append(EQ_ZERO);
+    dict_append(EXIT);
+
+    // ── Control flow (immediate words) ───────────────────────────────────────
+    //
+    // These words run at COMPILE TIME and compile opcodes into the target word.
+    // Pattern: to compile opcode X into target → push X, then COMMA.
+    // begin leaves HERE on stack; until/again/while/repeat consume it.
+
+    make_word("begin", 5);                      // ( -- here )
+    dict_append(HERE);
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("until", 5);                      // ( here -- ) compile: LIT here 0JMP?
+    dict_append(LIT);  dict_append(LIT);        // push LIT opcode value
+    dict_append(COMMA);                         // write LIT to target
+    dict_append(COMMA);                         // write begin_addr to target
+    dict_append(LIT);  dict_append(JMP_IF_ZERO);
+    dict_append(COMMA);                         // write JMP_IF_ZERO to target
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("again", 5);                      // ( here -- ) compile: LIT here JMP
+    dict_append(LIT);  dict_append(LIT);
+    dict_append(COMMA);
+    dict_append(COMMA);
+    dict_append(LIT);  dict_append(JMP);
+    dict_append(COMMA);
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("if", 2);                         // ( -- ph ) compile: LIT 0 0JMP?
+    dict_append(LIT);  dict_append(LIT);
+    dict_append(COMMA);                         // write LIT to target
+    dict_append(HERE);                          // push placeholder addr
+    dict_append(LIT);  dict_append(0);
+    dict_append(COMMA);                         // write 0 placeholder
+    dict_append(LIT);  dict_append(JMP_IF_ZERO);
+    dict_append(COMMA);                         // write JMP_IF_ZERO
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("then", 4);                       // ( ph -- ) fix placeholder to here
+    dict_append(RPUSH);                         // save ph
+    dict_append(HERE);
+    dict_append(RPOP);                          // restore ph
+    dict_append(DICT_STORE);                    // dict_write(ph, here)
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("else", 4);                       // ( if_ph -- else_ph )
+    // fix if_ph to here+3 (past the LIT else_ph JMP we're about to compile)
+    dict_append(RPUSH);                         // save if_ph
+    dict_append(HERE);
+    dict_append(LIT);  dict_append(3);  dict_append(ADD);  // here+3
+    dict_append(RPOP);                          // restore if_ph
+    dict_append(DICT_STORE);                    // dict_write(if_ph, here+3)
+    // compile: LIT else_ph JMP
+    dict_append(LIT);  dict_append(LIT);
+    dict_append(COMMA);
+    dict_append(HERE);                          // push else_ph addr
+    dict_append(LIT);  dict_append(0);
+    dict_append(COMMA);                         // write 0 placeholder
+    dict_append(LIT);  dict_append(JMP);
+    dict_append(COMMA);
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("while", 5);                      // ( here -- here wh ) compile: LIT 0 0JMP?
+    dict_append(LIT);  dict_append(LIT);
+    dict_append(COMMA);
+    dict_append(HERE);                          // push while_ph addr
+    dict_append(LIT);  dict_append(0);
+    dict_append(COMMA);
+    dict_append(LIT);  dict_append(JMP_IF_ZERO);
+    dict_append(COMMA);
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("repeat", 6);                     // ( here wh -- )
+    dict_append(RPUSH);                         // save while_ph
+    // compile: LIT begin_addr JMP
+    dict_append(LIT);  dict_append(LIT);
+    dict_append(COMMA);
+    dict_append(COMMA);                         // write begin_addr
+    dict_append(LIT);  dict_append(JMP);
+    dict_append(COMMA);
+    // fix while_ph to current here
+    dict_append(HERE);
+    dict_append(RPOP);                          // restore while_ph
+    dict_append(DICT_STORE);
+    dict_append(EXIT);
+    make_immediate();
+
+    make_word("exit", 4);                       // compile EXIT opcode into caller
+    dict_append(LIT);  dict_append(EXIT);
+    dict_append(COMMA);
+    dict_append(EXIT);
+    make_immediate();
 }
 
 typedef uforth_stat (*wfunct_t)(void);
