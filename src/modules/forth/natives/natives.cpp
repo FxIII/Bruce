@@ -1,8 +1,13 @@
 #include "natives.h"
 #include "audio.h"
+#include "math.h"
 #include <Arduino.h>
 
 #define MAX_NATIVES 64
+
+static forth_output_fn _output_fn = nullptr;
+void forth_set_output(forth_output_fn fn) { _output_fn = fn; }
+void forth_output(const char *s) { if (_output_fn) _output_fn(s); }
 
 static forth_native_fn _fns[MAX_NATIVES + 1]; // 1-based
 static uint16_t _count = 0;
@@ -33,4 +38,5 @@ uforth_stat forth_dispatch(CELL id) {
 
 void forth_register_all() {
     forth_register_audio();
+    forth_register_math();
 }

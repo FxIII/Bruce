@@ -74,8 +74,6 @@ INLINE DCELL rpop(void) {
 }
 INLINE DCELL rpick(const DCELL n) { return uforth_uram->ds[uforth_uram->ridx+n]; }
 
-INLINE uint32_t dpop32(void) { return dpop(); }
-INLINE void dpush32(const uint32_t w2) { dpush(w2); }
 
 #define WORD_LEN_BITS 0x3F
 #define IMMEDIATE_BIT (1<<7)
@@ -92,27 +90,22 @@ enum {
     INVERT, COMMA, DCOMMA, RPUSH, RPOP, FETCH, STORE, DICT_FETCH, DICT_STORE,
     COMMA_STRING,
     VAR_ALLOT, CALLC, FIND, FIND_ADDR, CHAR_APPEND, CHAR_FETCH, DCHAR_FETCH,
-    POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, LAST_PRIMITIVE
+    POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, QLIT, LAST_PRIMITIVE
 };
 
 INLINE uint32_t abs32(int32_t v) {
     return (v < 0) ? v*-1 : v;
 }
 
-#ifdef SUPPORT_FLOAT_FIXED
 #include <math.h>
-#endif
 DCELL parse_num(char *s, uint8_t base) {
-#ifdef SUPPORT_FLOAT_FIXED
-    double f;
     char *p = s;
     while (*p != '\0' && *p != ' ' && *p != '.') ++p;
     if (*p == '.') {
-        f = strtod(s,NULL);
-        return (DCELL)FIXED_PT_MULT(f);
+        double f = strtod(s, NULL);
+        return (DCELL)(f * FIXED_PT_MULT);
     }
-#endif
-    return strtol(s,NULL, uforth_uram->base == 10 ? 0 : uforth_uram->base);
+    return strtol(s, NULL, uforth_uram->base == 10 ? 0 : uforth_uram->base);
 }
 
 CELL find_word(char* s, uint8_t len, DCELL* addr, bool *immediate, bool *prim);
@@ -431,6 +424,7 @@ void uforth_load_prims(void) {
     store_prim("d,", DCOMMA);
     store_prim(">num", PARSE_NUM);
     store_prim(">fnum", PARSE_FNUM);
+    store_prim("qlit", QLIT);
     store_prim("dummy,", INCR_HERE);
     store_prim("+", ADD);
     store_prim("-", SUB);
@@ -536,6 +530,14 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             dpush((((uint32_t)uforth_dict[wd_idx])<<16) |
                 (uint16_t)uforth_dict[wd_idx+1]);
             wd_idx+=2;
+            break;
+        case QLIT:
+            r1 = ((DCELL)(uint16_t)uforth_dict[wd_idx]   << 48) |
+                 ((DCELL)(uint16_t)uforth_dict[wd_idx+1] << 32) |
+                 ((DCELL)(uint16_t)uforth_dict[wd_idx+2] << 16) |
+                  (DCELL)(uint16_t)uforth_dict[wd_idx+3];
+            dpush(r1);
+            wd_idx += 4;
             break;
         case LESS_THAN_ZERO:
             r1 = dpop();
@@ -824,7 +826,7 @@ uforth_stat uforth_interpret(const char *str) {
                     uforth_abort();
                     return E_NOT_A_WORD;
                 }
-                dpush32(num);
+                dpush(num);
             } else {
                 stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
                 if (stat != UFORTH_OK) {
@@ -843,9 +845,17 @@ uforth_stat uforth_interpret(const char *str) {
                     dict_end_def();
                     return E_NOT_A_WORD;
                 }
-                dict_append(DLIT);
-                dict_append(((uint32_t)num)>>16);
-                dict_append(((uint16_t)num)&0xffff);
+                if (strchr(word, '.')) {
+                    dict_append(QLIT);
+                    dict_append((uint16_t)(num >> 48));
+                    dict_append((uint16_t)(num >> 32));
+                    dict_append((uint16_t)(num >> 16));
+                    dict_append((uint16_t)(num));
+                } else {
+                    dict_append(DLIT);
+                    dict_append(((uint32_t)num) >> 16);
+                    dict_append(((uint16_t)num) & 0xffff);
+                }
             } else if (word[0] == ';') {
                 uforth_iram->compiling = 0;
                 dict_append(EXIT);

@@ -306,6 +306,7 @@ void forthREPL() {
     uforth_load_prims();
     forth_define_words();
     forth_natives_reset();
+    forth_set_output(_appendOutput);
     _loadCorePrims();
     forth_register_all();
     _loadInitFs();
