@@ -129,62 +129,8 @@ static void _drawInput() {
 
 // ─── c_handle — called by uForth `cf` primitive ───────────────────────────────
 
-// ─── Native function implementations ─────────────────────────────────────────
-
-static void _fn_emit() {
-    char c = (char)dpop();
-    char s[2] = {c, '\0'};
-    _appendOutput(s);
-}
-
-static void _fn_cr() {
-    _appendOutput("\n");
-}
-
-static void _fn_dot() {
-    char buf[24];
-    DCELL n = dpop();
-    snprintf(buf, sizeof(buf), "%lld ", (long long)n);
-    _appendOutput(buf);
-}
-
-static void _fn_cls() {
-    _term.clear();
-    _term.render();
-}
-
-static void _fn_words() {
-    _appendOutput("\n");
-    CELL idx = dict->last_word_idx;
-    while (idx) {
-        uint8_t flags = (uint8_t)uforth_dict[idx + 1];
-        uint8_t len   = flags & 0x3F;
-        if (len > 0 && len < 63) {
-            char name[64];
-            memcpy(name, (char *)(uforth_dict + idx + 2), len);
-            name[len] = '\0';
-            _appendOutput(name);
-            _appendOutput(" ");
-        }
-        idx = uforth_dict[idx];
-    }
-    _appendOutput("\n");
-}
-
-// ─── c_handle — called by uForth `cf` primitive ───────────────────────────────
-
 extern "C" uforth_stat c_handle(void) {
     return forth_dispatch((CELL)dpop());
-}
-
-// ─── Core I/O words ───────────────────────────────────────────────────────────
-
-static void _loadCorePrims() {
-    forth_register("emit",  _fn_emit);
-    forth_register("cr",    _fn_cr);
-    forth_register(".",     _fn_dot);
-    forth_register("cls",   _fn_cls);
-    forth_register("words", _fn_words);
 }
 
 // ─── Main REPL ────────────────────────────────────────────────────────────────
@@ -218,7 +164,7 @@ void forthREPL() {
     forth_define_words();
     forth_natives_reset();
     forth_set_output(_appendOutput);
-    _loadCorePrims();
+    forth_set_cls([]() { _term.clear(); _term.render(); });
     forth_register_all();
 
     _appendOutput("uForth 1.2  type 'bye' to exit\n");
