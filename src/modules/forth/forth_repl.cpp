@@ -9,7 +9,6 @@
 #include <globals.h>
 #include "core/display.h"
 #include "core/mykeyboard.h"
-#include "core/sd_functions.h"
 
 // ─── Dictionary allocation ────────────────────────────────────────────────────
 
@@ -35,11 +34,6 @@ static bool   _scrollMode    = false;  // opt toggle: hide input, arrows scroll 
 static std::deque<std::string> _history;   // front = most recent
 static int                     _historyIdx = -1;  // -1 = not browsing; 0 = most recent
 static String                  _inputSaved;        // line saved when entering history
-
-// Source log: accumulates `: word ... ;` lines so `store` can replay them
-#define MAX_SOURCE_LOG 64
-static String _sourceLog[MAX_SOURCE_LOG];
-static int    _sourceLogCount = 0;
 
 // ─── Output helpers ───────────────────────────────────────────────────────────
 
@@ -193,88 +187,6 @@ static void _loadCorePrims() {
     forth_register("words", _fn_words);
 }
 
-// ─── Persistence ─────────────────────────────────────────────────────────────
-
-static FS *_pickFS() {
-    if (SD.begin()) return &SD;
-    return &LittleFS;
-}
-
-static void _loadInitFs() {
-    FS *fs = _pickFS();
-    File f = fs->open("/forth/init.fs", FILE_READ);
-    if (!f) return;
-
-    String line;
-    while (f.available()) {
-        char c = (char)f.read();
-        if (c == '\n') {
-            line.trim();
-            if (line.length() > 0) {
-                char buf[TIB_SIZE];
-                strncpy(buf, line.c_str(), sizeof(buf) - 1);
-                buf[sizeof(buf) - 1] = '\0';
-                uforth_interpret(buf);
-            }
-            line = "";
-        } else {
-            line += c;
-        }
-    }
-    line.trim();
-    if (line.length() > 0) {
-        char buf[TIB_SIZE];
-        strncpy(buf, line.c_str(), sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';
-        uforth_interpret(buf);
-    }
-    f.close();
-}
-
-// `store [prefix]` — write matching source-log entries to /forth/init.fs.
-static void _storeWords(const String &prefix) {
-    FS *fs = _pickFS();
-    fs->mkdir("/forth");
-
-    String existing = "";
-    File r = fs->open("/forth/init.fs", FILE_READ);
-    if (r) {
-        while (r.available()) existing += (char)r.read();
-        r.close();
-    }
-
-    File w = fs->open("/forth/init.fs", FILE_WRITE);
-    if (!w) { _appendOutput("store: write failed\n"); return; }
-
-    int start = 0;
-    while (start < (int)existing.length()) {
-        int nl = existing.indexOf('\n', start);
-        if (nl < 0) nl = existing.length();
-        String line = existing.substring(start, nl);
-        line.trim();
-        start = nl + 1;
-        if (line.length() == 0) continue;
-        if (prefix.length() > 0 && line.startsWith(": ")) {
-            int sp = line.indexOf(' ', 2);
-            String wname = (sp > 2) ? line.substring(2, sp) : line.substring(2);
-            if (wname.startsWith(prefix)) continue;
-        }
-        w.println(line);
-    }
-
-    for (int i = 0; i < _sourceLogCount; i++) {
-        String entry = _sourceLog[i];
-        int sp = entry.indexOf(' ', 2);
-        String wname = (sp > 2) ? entry.substring(2, sp) : entry.substring(2);
-        if (prefix.length() == 0 || wname.startsWith(prefix)) {
-            w.println(entry);
-        }
-    }
-
-    w.close();
-    _appendOutput("saved /forth/init.fs\n");
-}
-
 // ─── Main REPL ────────────────────────────────────────────────────────────────
 
 static struct dict _dictBuf;
@@ -287,7 +199,6 @@ void forthREPL() {
     _nInputLines = 1;
     _scrollMode  = false;
     _historyIdx  = -1;
-    _sourceLogCount = 0;
 
     // Allocate dict once, reinitialize on each entry
     if (dict == nullptr) {
@@ -309,7 +220,6 @@ void forthREPL() {
     forth_set_output(_appendOutput);
     _loadCorePrims();
     forth_register_all();
-    _loadInitFs();
 
     _appendOutput("uForth 1.2  type 'bye' to exit\n");
     _term.render();
@@ -399,19 +309,13 @@ void forthREPL() {
                 break;
             }
 
-            if (line.startsWith("store")) {
-                String prefix = "";
-                if (line.length() > 6) { prefix = line.substring(6); prefix.trim(); }
-                _storeWords(prefix);
-            } else {
+            {
                 char buf[TIB_SIZE];
                 strncpy(buf, line.c_str(), sizeof(buf) - 1);
                 buf[sizeof(buf) - 1] = '\0';
                 uforth_stat st = uforth_interpret(buf);
                 if (st == UFORTH_OK) {
                     _appendOutput(" ok\n");
-                    if (line.startsWith(":") && _sourceLogCount < MAX_SOURCE_LOG)
-                        _sourceLog[_sourceLogCount++] = line;
                 } else {
                     char errbuf[24];
                     snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
