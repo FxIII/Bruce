@@ -24,6 +24,16 @@ static void _fn_cls() {
     forth_cls();
 }
 
+static void _fn_line_comment() {
+    char c;
+    do { c = uforth_next_char(); } while (c != 0 && c != '\n');
+}
+
+static void _fn_paren_comment() {
+    char c;
+    do { c = uforth_next_char(); } while (c != 0 && c != ')');
+}
+
 static void _fn_words() {
     forth_output("\n");
     CELL idx = dict->last_word_idx;
@@ -48,4 +58,6 @@ void forth_register_core() {
     forth_register(".",     _fn_dot);
     forth_register("cls",   _fn_cls);
     forth_register("words", _fn_words);
+    forth_register("\\",    _fn_line_comment);  make_immediate();
+    forth_register("(",     _fn_paren_comment); make_immediate();
 }

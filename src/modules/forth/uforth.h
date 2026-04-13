@@ -105,10 +105,11 @@ extern void uforth_init(void);
 extern void uforth_load_prims(void);
 extern void uforth_abort(void);
 extern void forth_define_native(const char *name, CELL id);
-extern void forth_define_words(void);
 extern uforth_stat uforth_interpret(const char*);
 extern uforth_stat c_handle(void);
 char* uforth_next_word(void);
+char  uforth_next_char(void);
+void  make_immediate(void);
 
 #define IRAM_BYTES (DCELL)(sizeof(struct uforth_iram))/sizeof(DCELL)
 #define URAM_HDR_BYTES (DCELL)(sizeof(struct uforth_uram))/sizeof(DCELL)

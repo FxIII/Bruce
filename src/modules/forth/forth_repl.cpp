@@ -1,7 +1,9 @@
 #include "forth_repl.h"
 #include "forth_terminal.h"
 #include "uforth.h"
+#include "uforth_core.h"
 #include "natives/natives.h"
+#include "natives/modules.h"
 
 #include <Arduino.h>
 #include <deque>
@@ -35,11 +37,75 @@ static std::deque<std::string> _history;   // front = most recent
 static int                     _historyIdx = -1;  // -1 = not browsing; 0 = most recent
 static String                  _inputSaved;        // line saved when entering history
 
+// ─── Alias table ─────────────────────────────────────────────────────────────
+
+#define MAX_ALIASES 32
+
+struct AliasEntry {
+    char from[32];   // short token or prefix (with trailing dot)
+    char to[128];    // canonical expanded name
+};
+
+static AliasEntry _aliases[MAX_ALIASES];
+static int        _aliasCount = 0;
+
+static String _expandToken(const String &token) {
+    for (int i = 0; i < _aliasCount; i++)
+        if (token == _aliases[i].from) return String(_aliases[i].to);
+    for (int i = 0; i < _aliasCount; i++) {
+        int flen = strlen(_aliases[i].from);
+        if (flen > 0 && _aliases[i].from[flen - 1] == '.' && token.startsWith(_aliases[i].from))
+            return String(_aliases[i].to) + token.substring(flen);
+    }
+    return token;
+}
+
+static String _expandLine(const String &line) {
+    if (_aliasCount == 0) return line;
+    String result;
+    int i = 0, len = line.length();
+    while (i < len) {
+        int spStart = i;
+        while (i < len && line[i] == ' ') i++;
+        result += line.substring(spStart, i);
+        if (i >= len) break;
+        int tokStart = i;
+        while (i < len && line[i] != ' ') i++;
+        result += _expandToken(line.substring(tokStart, i));
+    }
+    return result;
+}
+
+static void _parseAlias(const String &line) {
+    // syntax: alias <dst-short> <src-long>
+    String rest = line.substring(6);
+    rest.trim();
+    int sp = rest.indexOf(' ');
+    if (sp < 0) { forth_output("usage: alias <dst> <src>\n"); return; }
+    String dst = rest.substring(0, sp);
+    String src = rest.substring(sp + 1);
+    src.trim();
+    if (src.length() == 0) { forth_output("usage: alias <dst> <src>\n"); return; }
+    if (_aliasCount >= MAX_ALIASES) { forth_output("alias: table full\n"); return; }
+    // expand src against existing aliases before storing
+    String canonical = _expandToken(src);
+    // if dst ends with '.' and canonical doesn't, add trailing dot
+    if (dst.endsWith(".") && !canonical.endsWith(".")) canonical += ".";
+    strncpy(_aliases[_aliasCount].from, dst.c_str(), 31);
+    _aliases[_aliasCount].from[31] = '\0';
+    strncpy(_aliases[_aliasCount].to, canonical.c_str(), 127);
+    _aliases[_aliasCount].to[127] = '\0';
+    _aliasCount++;
+}
+
 // ─── Output helpers ───────────────────────────────────────────────────────────
 
 // Write to terminal buffer only — caller is responsible for calling render()
 static void _appendOutput(const char *s) {
     _term.print(s);
+}
+extern "C" void c_appendOutput(const char *s) {
+    _appendOutput(s);
 }
 
 // ─── Input line ──────────────────────────────────────────────────────────────
@@ -133,6 +199,15 @@ extern "C" uforth_stat c_handle(void) {
     return forth_dispatch((CELL)dpop());
 }
 
+static void _fn_aliases() {
+    if (_aliasCount == 0) { _appendOutput("(no aliases)\n"); return; }
+    char buf[128];
+    for (int i = 0; i < _aliasCount; i++) {
+        snprintf(buf, sizeof(buf), "%s -> %s\n", _aliases[i].from, _aliases[i].to);
+        _appendOutput(buf);
+    }
+}
+
 // ─── Main REPL ────────────────────────────────────────────────────────────────
 
 static struct dict _dictBuf;
@@ -145,6 +220,9 @@ void forthREPL() {
     _nInputLines = 1;
     _scrollMode  = false;
     _historyIdx  = -1;
+    _aliasCount  = 0;
+
+    forth_modules_init();
 
     // Allocate dict once, reinitialize on each entry
     if (dict == nullptr) {
@@ -161,11 +239,18 @@ void forthREPL() {
 
     uforth_init();
     uforth_load_prims();
-    forth_define_words();
     forth_natives_reset();
     forth_set_output(_appendOutput);
     forth_set_cls([]() { _term.clear(); _term.render(); });
     forth_register_all();
+    forth_register("aliases", _fn_aliases);
+    uforth_load_core();
+    forth_set_add_alias([](const char *from, const char *to) {
+        if (_aliasCount >= MAX_ALIASES) return;
+        strncpy(_aliases[_aliasCount].from, from, 31); _aliases[_aliasCount].from[31] = '\0';
+        strncpy(_aliases[_aliasCount].to,   to,   127); _aliases[_aliasCount].to[127] = '\0';
+        _aliasCount++;
+    });
 
     _appendOutput("uForth 1.2  type 'bye' to exit\n");
     _term.render();
@@ -255,13 +340,19 @@ void forthREPL() {
                 break;
             }
 
-            {
+            if (line.startsWith("alias ")) {
+                _parseAlias(line);
+                _appendOutput(" ok\n");
+            } else {
+                String canonical = _expandLine(line);
                 char buf[TIB_SIZE];
-                strncpy(buf, line.c_str(), sizeof(buf) - 1);
+                strncpy(buf, canonical.c_str(), sizeof(buf) - 1);
                 buf[sizeof(buf) - 1] = '\0';
                 uforth_stat st = uforth_interpret(buf);
                 if (st == UFORTH_OK) {
                     _appendOutput(" ok\n");
+                    if (canonical.startsWith(":"))
+                        forth_log_word(buf);
                 } else {
                     char errbuf[24];
                     snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
@@ -296,4 +387,6 @@ void forthREPL() {
             _drawInput();
         }
     }
+
+    forth_modules_deinit();
 }
