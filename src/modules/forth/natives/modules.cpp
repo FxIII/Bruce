@@ -1,6 +1,7 @@
 #include "modules.h"
 #include "natives.h"
 #include "audio.h"
+#include "ir.h"
 #include "../uforth.h"
 #include <Arduino.h>
 #include <SD.h>
@@ -66,10 +67,25 @@ static void _mkdirp(FS *fs, const char *filepath) {
     }
 }
 
-// ─── forth_register_load — native module dispatcher ──────────────────────────
+// ─── Native module registry ───────────────────────────────────────────────────
+
+struct NativeModule {
+    const char *name;
+    void (*register_fn)(const char *prefix);
+};
+
+static const NativeModule _native_modules[] = {
+    { "br.audio", forth_register_audio },
+    { "br.ir",    forth_register_ir    },
+};
 
 bool forth_register_load(const char *lib, const char *prefix) {
-    if (strcmp(lib, "br.audio") == 0) { forth_register_audio(prefix); return true; }
+    for (size_t i = 0; i < sizeof(_native_modules) / sizeof(_native_modules[0]); i++) {
+        if (strcmp(lib, _native_modules[i].name) == 0) {
+            _native_modules[i].register_fn(prefix);
+            return true;
+        }
+    }
     return false;
 }
 
