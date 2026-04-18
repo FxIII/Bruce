@@ -19,8 +19,6 @@ static void fn_tone() {
 #endif
 }
 
-void forth_register_audio(const char *prefix) {
-    char name[64];
-    snprintf(name, sizeof(name), "%s.tone", prefix);
-    forth_register(name, fn_tone);
+void forth_register_audio() {
+    forth_register("br.audio.tone", fn_tone);
 }

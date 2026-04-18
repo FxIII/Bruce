@@ -71,7 +71,7 @@ static void _mkdirp(FS *fs, const char *filepath) {
 
 struct NativeModule {
     const char *name;
-    void (*register_fn)(const char *prefix);
+    void (*register_fn)();
 };
 
 static const NativeModule _native_modules[] = {
@@ -79,10 +79,10 @@ static const NativeModule _native_modules[] = {
     { "br.ir",    forth_register_ir    },
 };
 
-bool forth_register_load(const char *lib, const char *prefix) {
+bool forth_register_load(const char *lib) {
     for (size_t i = 0; i < sizeof(_native_modules) / sizeof(_native_modules[0]); i++) {
         if (strcmp(lib, _native_modules[i].name) == 0) {
-            _native_modules[i].register_fn(prefix);
+            _native_modules[i].register_fn();
             return true;
         }
     }
@@ -149,7 +149,7 @@ static void fn_store() {
 // ─── load (shared implementation) ────────────────────────────────────────────
 
 static void _doLoad(const char *lib) {
-    bool r = forth_register_load(lib, lib);
+    bool r = forth_register_load(lib);
     if(r){
       forth_output("found native\n");
     }

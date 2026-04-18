@@ -83,15 +83,14 @@ static void fn_ir_kaseikyo() {
     sendKaseikyoCommand(String(addr_str), String(cmd_str), true);
 }
 
-void forth_register_ir(const char *prefix) {
-    char name[64];
-    snprintf(name, sizeof(name), "%s.nec",      prefix); forth_register(name, fn_ir_nec);
-    snprintf(name, sizeof(name), "%s.necext",   prefix); forth_register(name, fn_ir_necext);
-    snprintf(name, sizeof(name), "%s.rc5",      prefix); forth_register(name, fn_ir_rc5);
-    snprintf(name, sizeof(name), "%s.rc6",      prefix); forth_register(name, fn_ir_rc6);
-    snprintf(name, sizeof(name), "%s.samsung",  prefix); forth_register(name, fn_ir_samsung);
-    snprintf(name, sizeof(name), "%s.sirc",     prefix); forth_register(name, fn_ir_sirc);
-    snprintf(name, sizeof(name), "%s.sirc15",   prefix); forth_register(name, fn_ir_sirc15);
-    snprintf(name, sizeof(name), "%s.sirc20",   prefix); forth_register(name, fn_ir_sirc20);
-    snprintf(name, sizeof(name), "%s.kaseikyo", prefix); forth_register(name, fn_ir_kaseikyo);
+void forth_register_ir() {
+    forth_register("br.ir.nec",      fn_ir_nec);
+    forth_register("br.ir.necext",   fn_ir_necext);
+    forth_register("br.ir.rc5",      fn_ir_rc5);
+    forth_register("br.ir.rc6",      fn_ir_rc6);
+    forth_register("br.ir.samsung",  fn_ir_samsung);
+    forth_register("br.ir.sirc",     fn_ir_sirc);
+    forth_register("br.ir.sirc15",   fn_ir_sirc15);
+    forth_register("br.ir.sirc20",   fn_ir_sirc20);
+    forth_register("br.ir.kaseikyo", fn_ir_kaseikyo);
 }
