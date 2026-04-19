@@ -231,6 +231,6 @@ static void fn_loada() {
 
 void forth_register_modules() {
     forth_register("store", fn_store);
-    forth_register("load",  fn_load);
-    forth_register("loada", fn_loada);
+    forth_register("load",  fn_load);  make_immediate();
+    forth_register("loada", fn_loada); make_immediate();
 }
