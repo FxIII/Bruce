@@ -2,6 +2,7 @@
 #include "natives.h"
 #include "audio.h"
 #include "ir.h"
+#include "ws.h"
 #include "../uforth.h"
 #include <Arduino.h>
 #include <SD.h>
@@ -77,6 +78,7 @@ struct NativeModule {
 static const NativeModule _native_modules[] = {
     { "br.audio", forth_register_audio },
     { "br.ir",    forth_register_ir    },
+    { "br.ws",    forth_register_ws    },
 };
 
 bool forth_register_load(const char *lib) {
