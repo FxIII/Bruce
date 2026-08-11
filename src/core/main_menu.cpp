@@ -24,6 +24,7 @@ MainMenu::MainMenu() {
         &fileMenu,
 #if !defined(LITE_VERSION) && !defined(DISABLE_INTERPRETER)
         &scriptsMenu,
+        &forthMenu,
 #endif
         &clockMenu,
         &othersMenu,
