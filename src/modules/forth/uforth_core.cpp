@@ -86,6 +86,8 @@ static const char * const _core[] = {
     // ── Derived ────────────────────────────────────────────────────────────────
     ": abs dup <0 if negate then ;",
     ": dup? dup 0= 0= if dup then ;",
+    ": .s depth dup if dup 0 do dup i - pick . loop then drop ;",
+    ": type 0 begin 2dup +c@ dup 0= if drop drop drop exit then emit 1+ again ;",
 
     // ── Tick / compile-time helpers ────────────────────────────────────────────
     // ['] uses the "LIT is 1" hack: (find) returns opcode value for primitives,

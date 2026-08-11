@@ -1,6 +1,7 @@
 #include "modules.h"
 #include "natives.h"
 #include "audio.h"
+#include "i2c.h"
 #include "ir.h"
 #include "ws.h"
 #include "../uforth.h"
@@ -77,6 +78,7 @@ struct NativeModule {
 
 static const NativeModule _native_modules[] = {
     { "br.audio", forth_register_audio },
+    { "br.i2c",   forth_register_i2c  },
     { "br.ir",    forth_register_ir    },
     { "br.ws",    forth_register_ws    },
 };

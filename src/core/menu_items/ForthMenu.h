@@ -10,7 +10,10 @@ public:
     void optionsMenu(void);
     void drawIcon(float scale);
     bool hasTheme() { return false; }
-    String themePath() { return ""; }
+    const String& themePath() override {
+        static const String empty = "";
+        return empty;
+    }
 };
 
 #endif
