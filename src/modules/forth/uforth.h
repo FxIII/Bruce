@@ -126,6 +126,7 @@ char* uforth_next_word(void);
 void c_ext_init(void);
 void c_ext_create_cmds(void);
 uforth_stat c_ext_handle_cmds(CELL n);
+void forth_define_native(const char *name, CELL id);
 
 #ifdef __cplusplus
 }

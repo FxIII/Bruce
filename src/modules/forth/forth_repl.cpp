@@ -1,13 +1,14 @@
 #include "forth_repl.h"
 #include "uforth.h"
 #include "core/ConsoleWidget.h"
+#include "natives/natives.h"
 #include <Arduino.h>
 
 struct dict *dict = nullptr;
 static struct dict _dictBuf;
 
 extern "C" uforth_stat c_handle(void) {
-    return UFORTH_OK;
+    return forth_dispatch((CELL)dpop());
 }
 
 // Global output redirection callback for uForth C output
@@ -36,9 +37,15 @@ void forthREPL() {
     dict->word_size = sizeof(CELL);
     dict->max_cells = MAX_DICT_CELLS;
 
-    // 3. Initialize uForth engine
+    // 3. Initialize uForth engine and natives
     uforth_init();
     uforth_load_prims();
+
+    forth_natives_reset();
+    forth_register_all();
+
+    forth_set_output([](const char *s) { if (_activeConsole) _activeConsole->print(s); });
+    forth_set_cls([]() { if (_activeConsole) { _activeConsole->clear(); _activeConsole->render(); } });
 
     // 4. Print welcome greeting
     widget.clear();
