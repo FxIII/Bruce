@@ -113,6 +113,8 @@ void forthREPL() {
 
         forth_natives_reset();
         forth_register_all();
+
+        uforth_load_core();
     }
 
     forth_set_output([](const char *s) { if (_activeConsole) _activeConsole->print(s); });
