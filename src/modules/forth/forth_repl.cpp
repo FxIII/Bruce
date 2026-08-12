@@ -4,6 +4,9 @@
 #include "natives/natives.h"
 #include <Arduino.h>
 
+// Set to 1 to enable session save/load, 0 to always boot clean
+#define FORTH_SESSION_ENABLED 0
+
 struct dict *dict = nullptr;
 static struct dict _dictBuf;
 
@@ -41,6 +44,14 @@ static bool loadForthSession(const char* filepath, FS *fs) {
     }
     file.close();
 
+    // Validate dict version — if wrong, discard session and delete the bad file
+    if (dict->version != DICT_VERSION || dict->word_size != sizeof(CELL) || dict->max_cells != MAX_DICT_CELLS) {
+        Serial.printf("[Forth] Session version mismatch (ver=%d wordsize=%d maxcells=%d), discarding.\n",
+                      (int)dict->version, (int)dict->word_size, (int)dict->max_cells);
+        fs->remove(filepath);
+        return false;
+    }
+
     // Restore engine pointers
     uforth_dict = (CELL*)dict;
     uforth_iram = (struct uforth_iram*) uforth_ram;
@@ -53,6 +64,7 @@ static bool loadForthSession(const char* filepath, FS *fs) {
     forth_set_restore_mode(false);
 
     log_d("Forth session loaded successfully from %s", filepath);
+
     return true;
 }
 
@@ -93,6 +105,7 @@ void forthREPL() {
     }
 
     // 3. Mount filesystem & load session
+#if FORTH_SESSION_ENABLED
     FS *fs = nullptr;
     bool hasStorage = getFsStorage(fs);
     bool sessionLoaded = false;
@@ -100,9 +113,11 @@ void forthREPL() {
     if (hasStorage && fs->exists("/forth/session.bin")) {
         sessionLoaded = loadForthSession("/forth/session.bin", fs);
     }
-
-    if (!sessionLoaded) {
-        log_d("No Forth session found, initializing clean VM");
+    if (!sessionLoaded)
+#endif
+    {
+        // Clean boot
+        Serial.println("[Forth] Clean boot");
         memset(dict, 0, sizeof(struct dict));
         dict->version   = DICT_VERSION;
         dict->word_size = sizeof(CELL);
@@ -117,7 +132,10 @@ void forthREPL() {
         uforth_load_core();
     }
 
-    forth_set_output([](const char *s) { if (_activeConsole) _activeConsole->print(s); });
+    forth_set_output([](const char *s) {
+        Serial.printf("[OUT] '%s' console=%p\n", s, _activeConsole);
+        if (_activeConsole) _activeConsole->print(s);
+    });
     forth_set_cls([]() { if (_activeConsole) { _activeConsole->clear(); _activeConsole->render(); } });
 
     // 4. Print welcome greeting
@@ -143,7 +161,18 @@ void forthREPL() {
             strncpy(buf, line.c_str(), sizeof(buf) - 1);
             buf[sizeof(buf) - 1] = '\0';
 
-            uforth_interpret(buf);
+            Serial.printf("[REPL] interpret: '%s'\n", buf);
+            uforth_stat st = uforth_interpret(buf);
+            Serial.printf("[REPL] result: %d\n", (int)st);
+
+            if (st == UFORTH_OK) {
+                widget.print(" ok\n");
+            } else {
+                char errbuf[32];
+                snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
+                widget.print(errbuf);
+                uforth_abort();
+            }
             widget.render();
         }
 
@@ -152,10 +181,12 @@ void forthREPL() {
         }
     }
 
-    // 6. Save session and cleanup
+    // 6. Session save
+#if FORTH_SESSION_ENABLED
     if (hasStorage) {
         saveForthSession("/forth/session.bin", fs);
     }
+#endif
 
     _activeConsole = nullptr;
     if (dict != &_dictBuf) {

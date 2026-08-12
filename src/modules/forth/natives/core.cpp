@@ -6,6 +6,8 @@
 #include <Arduino.h>
 #include <FS.h>
 
+extern "C" void make_immediate(void);
+
 static void fn_cls() {
     forth_cls();
 }
@@ -66,7 +68,7 @@ static void fn_file_include() {
         String line = file.readStringUntil('\n');
         line.trim();
         if (line.isEmpty() || line.startsWith("\\")) continue; // Skip comments and empty lines
-        
+
         char buf[256];
         strncpy(buf, line.c_str(), sizeof(buf) - 1);
         buf[sizeof(buf) - 1] = '\0';
@@ -114,7 +116,7 @@ static void fn_block_load() {
         while (line.length() > 0 && (line.endsWith("\r") || line.endsWith("\n"))) {
             line.remove(line.length() - 1);
         }
-        
+
         CELL line_offset = addr + line_idx * 17;
         int len = line.length();
         if (len > 64) len = 64;
@@ -191,7 +193,118 @@ static void fn_set_len() {
     uforth_ram[base] = len;
 }
 
+static void fn_emit() {
+    char c = (char)dpop();
+    char s[2] = {c, '\0'};
+    forth_output(s);
+}
+
+static void fn_cr() {
+    forth_output("\n");
+}
+
+static void fn_dot() {
+    char buf[24];
+    DCELL n = dpop();
+    snprintf(buf, sizeof(buf), "%lld ", (long long)n);
+    Serial.printf("[DEBUG fn_dot] outputting: '%s'\n", buf);
+    forth_output(buf);
+}
+
+static void fn_words() {
+    Serial.println("[DEBUG fn_words] called");
+    forth_output("\n");
+    CELL idx = dict->last_word_idx;
+    int count = 0;
+    while (idx) {
+        uint8_t flags = (uint8_t)uforth_dict[idx + 1];
+        uint8_t len   = flags & 0x3F;
+        if (len > 0 && len < 63) {
+            char name[64];
+            memcpy(name, (char *)(uforth_dict + idx + 2), len);
+            name[len] = '\0';
+            Serial.printf("[DEBUG fn_words] word: '%s'\n", name);
+            forth_output(name);
+            forth_output(" ");
+            count++;
+        }
+        idx = uforth_dict[idx];
+    }
+    Serial.printf("[DEBUG fn_words] total words: %d\n", count);
+    forth_output("\n");
+}
+
+static void fn_line_comment() {
+    uforth_iram->tibidx = uforth_iram->tibclen;
+}
+
+static void fn_paren_comment() {
+    while (uforth_iram->tibidx < uforth_iram->tibclen) {
+        char c = uforth_iram->tib[uforth_iram->tibidx++];
+        if (c == ')') break;
+    }
+}
+
+static void fn_block_interpret() {
+    int num = dpop();
+    char filepath[64];
+    snprintf(filepath, sizeof(filepath), "/forth/blocks/%d.f", num);
+
+    FS *fs = nullptr;
+    if (!getFsStorage(fs)) {
+        forth_output("Storage not available\n");
+        return;
+    }
+
+    if (!fs->exists(filepath)) {
+        forth_output("Block file not found: ");
+        forth_output(filepath);
+        forth_output("\n");
+        return;
+    }
+
+    File file = fs->open(filepath, "r");
+    if (!file) {
+        forth_output("Failed to open block file\n");
+        return;
+    }
+
+    int line_num = 1;
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        if (line.isEmpty() || line.startsWith("\\")) {
+            line_num++;
+            continue;
+        }
+
+        char buf[256];
+        strncpy(buf, line.c_str(), sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+
+        uforth_stat st = uforth_interpret(buf);
+        if (st != UFORTH_OK) {
+            char errMsg[192];
+            snprintf(errMsg, sizeof(errMsg), "Error %d on line %d: %s\n", (int)st, line_num, buf);
+            forth_output(errMsg);
+            file.close();
+            uforth_abort_request(ABORT_NAW);
+            uforth_abort();
+            return;
+        }
+        line_num++;
+    }
+    file.close();
+}
+
 void forth_register_core() {
+    forth_register("emit", fn_emit);
+    forth_register("cr", fn_cr);
+    forth_register(".", fn_dot);
+    forth_register("words", fn_words);
+    forth_register("\\", fn_line_comment); make_immediate();
+    forth_register("(", fn_paren_comment); make_immediate();
+
     forth_register("br.display.cls", fn_cls);
     forth_register("br.display.writeLine", fn_write_line);
     forth_register("br.display.setChar", fn_set_char);
@@ -199,4 +312,6 @@ void forth_register_core() {
     forth_register("br.file.include", fn_file_include);
     forth_register("br.block.load", fn_block_load);
     forth_register("br.block.save", fn_block_save);
+
+    forth_register("load", fn_block_interpret);
 }
