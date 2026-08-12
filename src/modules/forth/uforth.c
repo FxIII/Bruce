@@ -28,6 +28,7 @@
   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #include <stdint.h>
+#include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,7 +79,7 @@ enum {
     NEXT, CNEXT, EXEC, LESS_THAN_ZERO, MAKE_TASK, SELECT_TASK,
     INVERT, COMMA, DCOMMA, RPUSH, RPOP, FETCH, STORE, DICT_FETCH, DICT_STORE,
     COMMA_STRING,
-    VAR_ALLOT, CALLC, FIND, FIND_ADDR, CHAR_APPEND, CHAR_FETCH, DCHAR_FETCH,
+    VAR_ALLOT, CALLC, FIND, FIND_ADDR, FIND_MINUS, CHAR_APPEND, CHAR_FETCH, DCHAR_FETCH,
     POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, LAST_PRIMITIVE
 };
 
@@ -234,6 +235,7 @@ void uforth_load_prims(void) {
     store_prim("select-task", SELECT_TASK);
     store_prim("(find)", FIND);
     store_prim("(find&)", FIND_ADDR);
+    store_prim("(find-)", FIND_MINUS);
     store_prim(",\"", COMMA_STRING); make_immediate();
     store_prim("postpone", POSTPONE); make_immediate();
     store_prim("next-word", NEXT);
@@ -493,30 +495,54 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             dict_append(r1);
             break;
         case PARSE_NUM:
-            r1 = dpop();
-            str1=uforth_count_str((CELL)r1,(CELL*)&r1);
-            str1[r1] = '\0';
-            dpush(parse_num(str1,uforth_uram->base));
+            {
+                CELL len;
+                str1 = uforth_count_str((CELL)dpop(), &len);
+                str1[len] = '\0';
+                dpush(parse_num(str1, uforth_uram->base));
+            }
             break;
         case PARSE_FNUM:
-            r1 = dpop();
-            str1=uforth_count_str((CELL)r1,(CELL*)&r1);
-            str1[r1] = '.';
-            str1[r1+1] = '\0';
-            dpush(parse_num(str1,uforth_uram->base));
+            {
+                CELL len;
+                str1 = uforth_count_str((CELL)dpop(), &len);
+                str1[len] = '.';
+                str1[len+1] = '\0';
+                dpush(parse_num(str1, uforth_uram->base));
+            }
             break;
         case FIND:
         case FIND_ADDR:
-            r1 = dpop();
-            str1=uforth_count_str((CELL)r1,(CELL*)&r1);
-            r1 = find_word(str1, r1, &r2, 0, &b);
-            if (r1 > 0) {
-                if (b) r1 = uforth_dict[r1];
+            {
+                CELL len;
+                str1 = uforth_count_str((CELL)dpop(), &len);
+                r1 = find_word(str1, len, &r2, 0, &b);
+                if (r1 > 0) {
+                    if (b) r1 = uforth_dict[r1];
+                }
+                if (cmd == FIND) {
+                    dpush(r1);
+                } else {
+                    dpush(r2);
+                }
             }
-            if (cmd == FIND) {
+            break;
+        case FIND_MINUS:
+            {
+                CELL addr = dpop();
+                CELL len = uforth_ram[addr];
+                char *s = (char*)&uforth_ram[addr + 1];
+                char tmp[64];
+                int slen = len < 63 ? (int)len : 63;
+                memcpy(tmp, s, slen); tmp[slen] = '\0';
+                printf("[find-] addr=%d len=%d word='%s'\n", (int)addr, (int)len, tmp);
+                r1 = find_word(s, (uint8_t)len, &r2, 0, &b);
+                printf("[find-] result=%d (b=%d, r2=%d)\n", (int)r1, (int)b, (int)r2);
+                if (r1 > 0) {
+                    if (b) r1 = uforth_dict[r1];
+                }
+                printf("[find-] final push=%d\n", (int)r1);
                 dpush(r1);
-            } else {
-                dpush(r2);
             }
             break;
         case POSTPONE:
