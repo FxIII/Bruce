@@ -177,9 +177,25 @@ static void fn_block_save() {
     log_d("fn_block_save: saved '%s'", filepath);
 }
 
+static void fn_set_char() {
+    int offset = dpop();
+    CELL base = dpop();
+    int c = dpop();
+    char *str = (char*)&uforth_ram[base];
+    str[offset] = c;
+}
+
+static void fn_set_len() {
+    CELL base = dpop();
+    int len = dpop();
+    uforth_ram[base] = len;
+}
+
 void forth_register_core() {
     forth_register("br.display.cls", fn_cls);
     forth_register("br.display.writeLine", fn_write_line);
+    forth_register("br.display.setChar", fn_set_char);
+    forth_register("br.display.setLen", fn_set_len);
     forth_register("br.file.include", fn_file_include);
     forth_register("br.block.load", fn_block_load);
     forth_register("br.block.save", fn_block_save);
