@@ -20,6 +20,7 @@ static const char * const _core[] = {
     ": 2dup over over ;",
     ": 2drop drop drop ;",
     ": r@ 1 rpick ;",
+    ": rdrop r> r> drop >r ;",
 
     // ── Arithmetic ─────────────────────────────────────────────────────────────
     ": nop ;",
@@ -39,6 +40,8 @@ static const char * const _core[] = {
     ": 0> 0 > ;",
     ": >= - <0 invert ;",
     ": <= swap >= ;",
+    ": min 2dup > if swap then drop ;",
+    ": max 2dup < if swap then drop ;",
 
     // ── Memory utilities ───────────────────────────────────────────────────────
     ": +! dup >r @ + r> ! ;",
@@ -128,13 +131,23 @@ static const char * const _core[] = {
     // defer creates an indirection word: stores a function pointer in RAM,
     // fetches and executes it at call time.
     ": defer _create [compile] lit _allot1 , [compile] @ [compile] exec [compile] ; ;",
-    ": is compiling? if [compile] lit postpone ' , [compile] 1+ [compile] @ [compile] ! else postpone ' 1+ @ ! then ; immediate",
+    ": is compiling? if [compile] lit postpone ' , [compile] 1+ [compile] @ [compile] ! else ' 1+ dict@ ! then ; immediate",
+    "defer ed",
 
     // ── allot / word ──────────────────────────────────────────────────────────
     ": allot 0 do _allot1 drop loop ;",
     "variable pad 160 4 / allot",
     "variable _delim",
     ": word _delim ! 0 pad ! begin next-char dup _delim @ = over 0= or if drop pad exit then pad c!+ again ;",
+
+    // ── Aliases ────────────────────────────────────────────────────────────────
+    ": cls br.display.cls ;",
+    ": write-line br.display.writeLine ;",
+    ": set-char br.display.setChar ;",
+    ": set-len br.display.setLen ;",
+    ": draw-cursor br.display.drawCursor ;",
+    ": block-load br.block.load ;",
+    ": block-save br.block.save ;",
 
     nullptr
 };
