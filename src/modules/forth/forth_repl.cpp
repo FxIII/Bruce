@@ -163,6 +163,7 @@ void forthREPL() {
 
             Serial.printf("[REPL] interpret: '%s'\n", buf);
             uforth_stat st = uforth_interpret(buf);
+
             Serial.printf("[REPL] result: %d\n", (int)st);
 
             if (st == UFORTH_OK) {

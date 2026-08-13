@@ -3,8 +3,8 @@ variable cx variable cy variable sy variable sx variable blk
 variable lines-buf 272 allot
 : L ( n -- addr ) 17 * lines-buf + ;
 : dl ( n -- ) lines-buf swap dup sy @ +
-  swap sx @ swap 8 * br.display.writeLine ;
-: cursor ( -- ) cx @ sx @ - cy @ sy @ - at-xy ." █" ;
+  swap sx @ swap 8 * write-line ;
+: cursor ( -- ) cx @ sx @ - cy @ sy @ - draw-cursor ;
 : move ( dx dy -- )
   cy @ + 0 max 15 min cy ! cx @ + 0 max 63 min cx ! ;
 : scroll ( -- )

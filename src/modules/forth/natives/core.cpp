@@ -2,6 +2,7 @@
 #include "natives.h"
 #include "../uforth.h"
 #include "core/display.h"
+#include "core/mykeyboard.h"
 #include "core/sd_functions.h"
 #include <Arduino.h>
 #include <FS.h>
@@ -193,6 +194,37 @@ static void fn_set_len() {
     uforth_ram[base] = len;
 }
 
+static void fn_draw_cursor() {
+    int y = dpop();
+    int x = dpop();
+    tft.fillRect(x * 6, y * 8 + 6, 6, 2, bruceConfig.priColor);
+}
+
+static void fn_key() {
+    while (true) {
+        keyStroke ks = _getKeyPress();
+        if (ks.pressed) {
+            if (ks.del) {
+                dpush(8);
+                return;
+            }
+            if (ks.enter) {
+                dpush(13);
+                return;
+            }
+            if (!ks.word.empty()) {
+                dpush((uint8_t)ks.word[0]);
+                return;
+            }
+            if (ks.exit_key) {
+                dpush(27);
+                return;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
 static void fn_emit() {
     char c = (char)dpop();
     char s[2] = {c, '\0'};
@@ -314,4 +346,7 @@ void forth_register_core() {
     forth_register("br.block.save", fn_block_save);
 
     forth_register("load", fn_block_interpret);
+
+    forth_register("br.display.drawCursor", fn_draw_cursor);
+    forth_register("key", fn_key);
 }

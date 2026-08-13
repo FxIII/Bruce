@@ -160,7 +160,7 @@ static CELL cmd;
 
 CELL uforth_make_task(DCELL uram, CELL ds, CELL rs, CELL rams) {
     struct uforth_uram* u = (struct uforth_uram*)
-        (uforth_ram + sizeof(struct uforth_iram)+(uram*sizeof(DCELL)));
+        (uforth_ram + IRAM_BYTES + uram); // IRAM_BYTES is in DCELL units, not raw bytes
     u->len = rams;
     u->base = 10;
     u->dsize = ds;
@@ -172,7 +172,7 @@ CELL uforth_make_task(DCELL uram, CELL ds, CELL rs, CELL rams) {
 
 void uforth_select_task(CELL uram) {
     uforth_uram = (struct uforth_uram*)
-        (uforth_ram + sizeof(struct uforth_iram)+(uram*sizeof(DCELL)));
+        (uforth_ram + IRAM_BYTES + uram); // IRAM_BYTES is in DCELL units, not raw bytes
     uforth_iram->curtask_idx = uram;
 }
 
