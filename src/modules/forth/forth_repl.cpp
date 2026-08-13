@@ -169,9 +169,15 @@ void forthREPL() {
             if (st == UFORTH_OK) {
                 widget.print(" ok\n");
             } else {
-                char errbuf[32];
-                snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
-                widget.print(errbuf);
+                if (strlen(uforth_abort_details) > 0) {
+                    char errbuf[128];
+                    snprintf(errbuf, sizeof(errbuf), " ? %s err %d\n", uforth_abort_details, (int)st);
+                    widget.print(errbuf);
+                } else {
+                    char errbuf[32];
+                    snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
+                    widget.print(errbuf);
+                }
                 uforth_abort();
             }
             widget.render();

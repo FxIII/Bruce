@@ -91,7 +91,7 @@ static void fn_block_load() {
 
     // 2. Open file
     char filepath[64];
-    snprintf(filepath, sizeof(filepath), "/forth/%d.f", num);
+    snprintf(filepath, sizeof(filepath), "/forth/blocks/%d.f", num);
 
     FS *fs = nullptr;
     if (!getFsStorage(fs)) {
@@ -140,7 +140,7 @@ static void fn_block_save() {
     CELL addr = dpop();
 
     char filepath[64];
-    snprintf(filepath, sizeof(filepath), "/forth/%d.f", num);
+    snprintf(filepath, sizeof(filepath), "/forth/blocks/%d.f", num);
 
     FS *fs = nullptr;
     if (!getFsStorage(fs)) {
@@ -148,9 +148,12 @@ static void fn_block_save() {
         return;
     }
 
-    // Ensure directory /forth/ exists
+    // Ensure directory /forth/blocks exists
     if (!fs->exists("/forth")) {
         fs->mkdir("/forth");
+    }
+    if (!fs->exists("/forth/blocks")) {
+        fs->mkdir("/forth/blocks");
     }
 
     File file = fs->open(filepath, "w");

@@ -67,8 +67,25 @@ typedef enum { NO_ABORT=0, ABORT_CTRL_C=1, ABORT_NAW=2,
      ABORT_ILLEGAL=3, ABORT_WORD=4, ABORT_STACKOVER=5 } abort_t;
 
 extern abort_t _uforth_abort_request;
+extern char uforth_abort_details[64];
 
-#define uforth_abort_request(why) _uforth_abort_request = why
+#define uforth_abort_request(why) do { \
+    _uforth_abort_request = why; \
+    uforth_abort_details[0] = '\0'; \
+} while(0)
+
+#define uforth_abort_request_details(why, word_ptr, word_len) do { \
+    _uforth_abort_request = why; \
+    int _len = (word_len) < 63 ? (word_len) : 63; \
+    memcpy(uforth_abort_details, (word_ptr), _len); \
+    uforth_abort_details[_len] = '\0'; \
+} while(0)
+
+#define uforth_abort_request_val(why, format, val) do { \
+    _uforth_abort_request = why; \
+    snprintf(uforth_abort_details, sizeof(uforth_abort_details), (format), (val)); \
+} while(0)
+
 #define uforth_aborting() (_uforth_abort_request != NO_ABORT)
 #define uforth_abort_reason() _uforth_abort_request
 #define uforth_abort_clr() (_uforth_abort_request = NO_ABORT)
