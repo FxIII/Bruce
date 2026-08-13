@@ -40,13 +40,14 @@
 
 CELL *uforth_dict;
 abort_t _uforth_abort_request;
+char uforth_abort_details[64] = {0};
 
 struct uforth_iram *uforth_iram;
 struct uforth_uram *uforth_uram;
 
 INLINE void dpush(const DCELL w) {
     if (uforth_uram->didx == (uforth_uram->dsize+uforth_uram->rsize-1)) {
-        uforth_abort_request(ABORT_STACKOVER);
+        uforth_abort_request_details(ABORT_STACKOVER, "data stack", 10);
         return;
     } else uforth_uram->ds[++uforth_uram->didx] = w;
 }
@@ -54,7 +55,7 @@ INLINE DCELL dpop(void) { return uforth_uram->ds[uforth_uram->didx--]; }
 INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
 INLINE void rpush(const DCELL w) {
     if (uforth_uram->ridx == (uforth_uram->dsize)) {
-        uforth_abort_request(ABORT_STACKOVER);
+        uforth_abort_request_details(ABORT_STACKOVER, "return stack", 12);
         return;
     }
     else uforth_uram->ds[--uforth_uram->ridx] = w;
@@ -79,7 +80,7 @@ enum {
     NEXT, CNEXT, EXEC, LESS_THAN_ZERO, MAKE_TASK, SELECT_TASK,
     INVERT, COMMA, DCOMMA, RPUSH, RPOP, FETCH, STORE, DICT_FETCH, DICT_STORE,
     COMMA_STRING,
-    VAR_ALLOT, CALLC, FIND, FIND_ADDR, FIND_MINUS, CHAR_APPEND, CHAR_FETCH, DCHAR_FETCH,
+    VAR_ALLOT, CALLC, FIND, FIND_ADDR, CHAR_APPEND, CHAR_FETCH, DCHAR_FETCH,
     POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, LAST_PRIMITIVE
 };
 
@@ -235,7 +236,6 @@ void uforth_load_prims(void) {
     store_prim("select-task", SELECT_TASK);
     store_prim("(find)", FIND);
     store_prim("(find&)", FIND_ADDR);
-    store_prim("(find-)", FIND_MINUS);
     store_prim(",\"", COMMA_STRING); make_immediate();
     store_prim("postpone", POSTPONE); make_immediate();
     store_prim("next-word", NEXT);
@@ -257,7 +257,7 @@ char* uforth_count_str(CELL addr, CELL* new_addr) {
 uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
     while(1) {
         if (wd_idx == 0) {
-            uforth_abort_request(ABORT_ILLEGAL);
+            uforth_abort_request_val(ABORT_ILLEGAL, "index %d", wd_idx);
             uforth_abort();
             return E_NOT_A_WORD;
         }
@@ -271,7 +271,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
 
         switch (cmd) {
         case 0:
-            uforth_abort_request(ABORT_ILLEGAL);
+            uforth_abort_request_val(ABORT_ILLEGAL, "opcode %d", cmd);
             uforth_abort();
             return E_NOT_A_WORD;
         case ABORT:
@@ -527,29 +527,12 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
                 }
             }
             break;
-        case FIND_MINUS:
-            {
-                CELL addr = dpop();
-                CELL len = uforth_ram[addr];
-                char *s = (char*)&uforth_ram[addr + 1];
-                char tmp[64];
-                int slen = len < 63 ? (int)len : 63;
-                memcpy(tmp, s, slen); tmp[slen] = '\0';
-                printf("[find-] addr=%d len=%d word='%s'\n", (int)addr, (int)len, tmp);
-                r1 = find_word(s, (uint8_t)len, &r2, 0, &b);
-                printf("[find-] result=%d (b=%d, r2=%d)\n", (int)r1, (int)b, (int)r2);
-                if (r1 > 0) {
-                    if (b) r1 = uforth_dict[r1];
-                }
-                printf("[find-] final push=%d\n", (int)r1);
-                dpush(r1);
-            }
-            break;
+
         case POSTPONE:
             str1 = uforth_next_word();
             r1 = find_word(str1, uforth_iram->tibwordlen, 0, 0, &b);
             if (r1 == 0) {
-                uforth_abort_request(ABORT_NAW);
+                uforth_abort_request_details(ABORT_NAW, str1, uforth_iram->tibwordlen);
                 uforth_abort();
                 return E_NOT_A_WORD;
             }
@@ -571,7 +554,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             uforth_select_task(dpop());
             break;
         default:
-            uforth_abort_request(ABORT_ILLEGAL);
+            uforth_abort_request_val(ABORT_ILLEGAL, "opcode %d", cmd);
             break;
         }
     CHECK_STAT:
@@ -621,7 +604,7 @@ uforth_stat uforth_interpret(const char *str) {
             if (wd_idx == 0) {
                 DCELL num = parse_num(word,uforth_uram->base);
                 if (num == 0 && word[0] != '0') {
-                    uforth_abort_request(ABORT_NAW);
+                    uforth_abort_request_details(ABORT_NAW, word, uforth_iram->tibwordlen);
                     uforth_abort();
                     return E_NOT_A_WORD;
                 }
@@ -639,7 +622,7 @@ uforth_stat uforth_interpret(const char *str) {
             if (wd_idx == 0) {
                 DCELL num = parse_num(word,uforth_uram->base);
                 if (num == 0 && word[0] != '0') {
-                    uforth_abort_request(ABORT_NAW);
+                    uforth_abort_request_details(ABORT_NAW, word, uforth_iram->tibwordlen);
                     uforth_abort();
                     dict_end_def();
                     return E_NOT_A_WORD;
