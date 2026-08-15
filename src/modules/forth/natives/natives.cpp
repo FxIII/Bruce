@@ -36,13 +36,13 @@ uint16_t forth_register(const char *name, forth_native_fn fn) {
     return id;
 }
 
-uforth_stat forth_dispatch(CELL id) {
+tbforth_stat forth_dispatch(CELL id) {
     if (id < 1 || id > _count || _fns[id] == nullptr) {
         log_e("forth_dispatch: invalid id=%d", id);
         return E_NOT_A_WORD;
     }
     _fns[id]();
-    return UFORTH_OK;
+    return U_OK;
 }
 
 void forth_register_all() {

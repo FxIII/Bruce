@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../uforth.h"
+#include "../tbforth.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,7 +12,7 @@ typedef void (*forth_cls_fn)(void);
 
 void forth_natives_reset(void);
 uint16_t forth_register(const char *name, forth_native_fn fn);
-uforth_stat forth_dispatch(CELL id);
+tbforth_stat forth_dispatch(CELL id);
 void forth_register_all(void);
 void forth_set_output(forth_output_fn fn);
 void forth_output(const char *s);

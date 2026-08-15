@@ -690,7 +690,7 @@ uforth_stat uforth_interpret(const char *str) {
     return UFORTH_OK;
 }
 
-void forth_define_native(const char *name, CELL id) {
+static void legacy_uforth_define_native(const char *name, CELL id) {
     make_word(name, strlen(name));
     dict_append(LIT);
     dict_append(id);
