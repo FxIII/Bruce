@@ -55,6 +55,10 @@ INLINE DCELL dpop(void) { return uforth_uram->ds[uforth_uram->didx--]; }
 INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
 INLINE void rpush(const DCELL w) {
     if (uforth_uram->ridx == (uforth_uram->dsize)) {
+        char err_msg[128];
+        snprintf(err_msg, sizeof(err_msg), " [R-Stack Over] ridx=%d dsize=%d w=%lld\n", 
+                 (int)uforth_uram->ridx, (int)uforth_uram->dsize, (long long)w);
+        uforth_print_str(err_msg);
         uforth_abort_request_details(ABORT_STACKOVER, "return stack", 12);
         return;
     }
@@ -80,7 +84,7 @@ enum {
     NEXT, CNEXT, EXEC, LESS_THAN_ZERO, MAKE_TASK, SELECT_TASK,
     INVERT, COMMA, DCOMMA, RPUSH, RPOP, FETCH, STORE, DICT_FETCH, DICT_STORE,
     COMMA_STRING,
-    VAR_ALLOT, CALLC, FIND, FIND_ADDR, CHAR_APPEND, CHAR_FETCH, DCHAR_FETCH,
+    VAR_ALLOT, CALLC, FIND, FIND_ADDR, CHAR_APPEND, CHAR_FETCH, CHAR_STORE, DCHAR_FETCH,
     POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, LAST_PRIMITIVE
 };
 
@@ -138,6 +142,19 @@ char* uforth_next_word(void) {
 }
 
 void uforth_abort(void) {
+    // Print return stack trace
+    CELL limit = uforth_uram->rsize + uforth_uram->dsize;
+    if (uforth_uram->ridx < limit) {
+        char msg[128];
+        int pos = snprintf(msg, sizeof(msg), " R-Stack:");
+        for (CELL i = uforth_uram->ridx; i < limit; i++) {
+            pos += snprintf(msg + pos, sizeof(msg) - pos, " %d", (int)uforth_uram->ds[i]);
+            if (pos >= sizeof(msg) - 10) break;
+        }
+        snprintf(msg + pos, sizeof(msg) - pos, "\n");
+        uforth_print_str(msg);
+    }
+
     if (uforth_iram->compiling) { dict_append(ABORT); }
     uforth_iram->compiling = 0;
     uforth_abort_clr();
@@ -178,6 +195,7 @@ void uforth_select_task(CELL uram) {
 }
 
 void uforth_init(void) {
+    memset(uforth_ram, 0, sizeof(uforth_ram));
     uforth_dict = (CELL*)dict;
     uforth_iram = (struct uforth_iram*) uforth_ram;
     uforth_iram->compiling = 0;
@@ -242,6 +260,7 @@ void uforth_load_prims(void) {
     store_prim("next-char", CNEXT);
     store_prim("c!+", CHAR_APPEND);
     store_prim("+c@", CHAR_FETCH);
+    store_prim("+c!", CHAR_STORE);
     store_prim("+dict-c@", DCHAR_FETCH);
     store_prim("here", HERE);
     store_prim("<0", LESS_THAN_ZERO);
@@ -257,7 +276,7 @@ char* uforth_count_str(CELL addr, CELL* new_addr) {
 uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
     while(1) {
         if (wd_idx == 0) {
-            uforth_abort_request_val(ABORT_ILLEGAL, "index %d", wd_idx);
+            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", wd_idx);
             uforth_abort();
             return E_NOT_A_WORD;
         }
@@ -271,7 +290,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
 
         switch (cmd) {
         case 0:
-            uforth_abort_request_val(ABORT_ILLEGAL, "opcode %d", cmd);
+            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", wd_idx - 1);
             uforth_abort();
             return E_NOT_A_WORD;
         case ABORT:
@@ -414,6 +433,13 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             str1+=r1;
             dpush(*str1);
             break;
+        case CHAR_STORE:
+            r1 = dpop(); // offset
+            r2 = dpop(); // base
+            str1 = (char*)&uforth_ram[r2];
+            str1 += r1;
+            *str1 = (char)dpop(); // char
+            break;
         case DCHAR_FETCH:
             r1 = dpop();
             r2 = dpop();
@@ -554,7 +580,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             uforth_select_task(dpop());
             break;
         default:
-            uforth_abort_request_val(ABORT_ILLEGAL, "opcode %d", cmd);
+            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", wd_idx - 1);
             break;
         }
     CHECK_STAT:
