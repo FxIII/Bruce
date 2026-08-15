@@ -121,13 +121,15 @@ extern void uforth_init(void);
 extern void uforth_load_prims(void);
 extern void uforth_abort(void);
 extern uforth_stat uforth_interpret(const char*);
+extern void uforth_print_str(const char*);
+extern void forth_output(const char*);
 extern uforth_stat c_handle(void);
 char* uforth_next_word(void);
 
 #define IRAM_BYTES (DCELL)(sizeof(struct uforth_iram))/sizeof(DCELL)
 #define URAM_HDR_BYTES (DCELL)(sizeof(struct uforth_uram))/sizeof(DCELL)
-#define VAR_ALLOT(n) (IRAM_BYTES+URAM_HDR_BYTES+dict_incr_varidx(n))
-#define VAR_ALLOT_1() (IRAM_BYTES+URAM_HDR_BYTES+dict_incr_varidx(1))
+#define VAR_ALLOT(n) (IRAM_BYTES+TASK0_URAM_CELLS+dict_incr_varidx(n))
+#define VAR_ALLOT_1() (IRAM_BYTES+TASK0_URAM_CELLS+dict_incr_varidx(1))
 #define PAD_ADDR (uforth_iram->total_ram - PAD_SIZE)
 #define PAD_STR (char*)&uforth_ram[PAD_ADDR+1]
 #define PAD_STRLEN uforth_ram[PAD_ADDR]

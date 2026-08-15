@@ -22,17 +22,20 @@ static void fn_write_line() {
     // Clear the specific row line (240x8)
     tft.fillRect(0, y_pixel, 240, 8, bruceConfig.bgColor);
 
-    // Access the counted string at lines-buf + line_idx * 17
-    CELL cell_idx = addr + line_idx * 17;
-    DCELL len = uforth_ram[cell_idx];
-    char *str = (char*)&uforth_ram[cell_idx + 1];
+    char *line_ptr = ((char*)&uforth_ram[addr]) + line_idx * 64;
+
+    // Find actual length by trimming trailing spaces
+    int len = 64;
+    while (len > 0 && line_ptr[len - 1] == ' ') {
+        len--;
+    }
 
     if (len > scroll_x) {
         int draw_len = len - scroll_x;
         if (draw_len > 40) draw_len = 40; // Max characters visible on Cardputer
 
         char buf[41];
-        strncpy(buf, str + scroll_x, draw_len);
+        strncpy(buf, line_ptr + scroll_x, draw_len);
         buf[draw_len] = '\0';
 
         tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
@@ -78,16 +81,9 @@ static void fn_file_include() {
     file.close();
 }
 
-static void fn_block_load() {
+static void fn_block_read() {
     int num = dpop();
     CELL addr = dpop();
-
-    // 1. Clear lines-buf (16 lines of 17 cells each)
-    for (int i = 0; i < 16; i++) {
-        uforth_ram[addr + i * 17] = 0;
-        char *str = (char*)&uforth_ram[addr + i * 17 + 1];
-        memset(str, ' ', 64);
-    }
 
     // 2. Open file
     char filepath[64];
@@ -95,18 +91,24 @@ static void fn_block_load() {
 
     FS *fs = nullptr;
     if (!getFsStorage(fs)) {
-        log_e("fn_block_load: storage not available");
+        log_e("fn_block_read: storage not available");
         return;
     }
 
+    // Initialize the entire buffer in RAM to spaces first
+    char *base_ptr = (char*)&uforth_ram[addr];
+    for (int i = 0; i < 16; i++) {
+        memset(base_ptr + i * 64, ' ', 64);
+    }
+
     if (!fs->exists(filepath)) {
-        log_w("fn_block_load: file '%s' does not exist, using empty block", filepath);
+        log_w("fn_block_read: file '%s' does not exist, using empty block", filepath);
         return;
     }
 
     File file = fs->open(filepath, "r");
     if (!file) {
-        log_e("fn_block_load: failed to open '%s'", filepath);
+        log_e("fn_block_read: failed to open '%s'", filepath);
         return;
     }
 
@@ -118,24 +120,18 @@ static void fn_block_load() {
             line.remove(line.length() - 1);
         }
 
-        CELL line_offset = addr + line_idx * 17;
         int len = line.length();
         if (len > 64) len = 64;
 
-        uforth_ram[line_offset] = len;
-        char *str = (char*)&uforth_ram[line_offset + 1];
-        memcpy(str, line.c_str(), len);
-        // Pad the rest with spaces
-        if (len < 64) {
-            memset(str + len, ' ', 64 - len);
-        }
+        char *line_ptr = base_ptr + line_idx * 64;
+        memcpy(line_ptr, line.c_str(), len);
         line_idx++;
     }
     file.close();
-    log_d("fn_block_load: loaded '%s'", filepath);
+    log_d("fn_block_read: loaded '%s'", filepath);
 }
 
-static void fn_block_save() {
+static void fn_block_write() {
     int num = dpop();
     CELL addr = dpop();
 
@@ -144,7 +140,7 @@ static void fn_block_save() {
 
     FS *fs = nullptr;
     if (!getFsStorage(fs)) {
-        log_e("fn_block_save: storage not available");
+        log_e("fn_block_write: storage not available");
         return;
     }
 
@@ -158,23 +154,22 @@ static void fn_block_save() {
 
     File file = fs->open(filepath, "w");
     if (!file) {
-        log_e("fn_block_save: failed to open '%s' for writing", filepath);
+        log_e("fn_block_write: failed to open '%s' for writing", filepath);
         return;
     }
 
+    char *base_ptr = (char*)&uforth_ram[addr];
     for (int i = 0; i < 16; i++) {
-        CELL line_offset = addr + i * 17;
-        DCELL len = uforth_ram[line_offset];
-        char *str = (char*)&uforth_ram[line_offset + 1];
+        char *line_ptr = base_ptr + i * 64;
 
         // Trim trailing spaces for cleaner text files on disk
-        int trim_len = len;
-        while (trim_len > 0 && str[trim_len - 1] == ' ') {
+        int trim_len = 64;
+        while (trim_len > 0 && line_ptr[trim_len - 1] == ' ') {
             trim_len--;
         }
 
         char buf[65];
-        memcpy(buf, str, trim_len);
+        memcpy(buf, line_ptr, trim_len);
         buf[trim_len] = '\0';
 
         file.println(buf);
@@ -183,19 +178,7 @@ static void fn_block_save() {
     log_d("fn_block_save: saved '%s'", filepath);
 }
 
-static void fn_set_char() {
-    int offset = dpop();
-    CELL base = dpop();
-    int c = dpop();
-    char *str = (char*)&uforth_ram[base];
-    str[offset] = c;
-}
 
-static void fn_set_len() {
-    CELL base = dpop();
-    int len = dpop();
-    uforth_ram[base] = len;
-}
 
 static void fn_draw_cursor() {
     int y = dpop();
@@ -342,14 +325,12 @@ void forth_register_core() {
 
     forth_register("br.display.cls", fn_cls);
     forth_register("br.display.writeLine", fn_write_line);
-    forth_register("br.display.setChar", fn_set_char);
-    forth_register("br.display.setLen", fn_set_len);
+    forth_register("br.display.drawCursor", fn_draw_cursor);
     forth_register("br.file.include", fn_file_include);
-    forth_register("br.block.load", fn_block_load);
-    forth_register("br.block.save", fn_block_save);
+    forth_register("br.block.read", fn_block_read);
+    forth_register("br.block.write", fn_block_write);
 
     forth_register("load", fn_block_interpret);
 
-    forth_register("br.display.drawCursor", fn_draw_cursor);
     forth_register("key", fn_key);
 }

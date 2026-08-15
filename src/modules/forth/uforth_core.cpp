@@ -143,11 +143,10 @@ static const char * const _core[] = {
     // ── Aliases ────────────────────────────────────────────────────────────────
     ": cls br.display.cls ;",
     ": write-line br.display.writeLine ;",
-    ": set-char br.display.setChar ;",
-    ": set-len br.display.setLen ;",
     ": draw-cursor br.display.drawCursor ;",
-    ": block-load br.block.load ;",
-    ": block-save br.block.save ;",
+    ": block-read br.block.read ;",
+    ": block-write br.block.write ;",
+    ": include br.file.include ;",
 
     nullptr
 };
