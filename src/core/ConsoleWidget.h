@@ -31,6 +31,11 @@ public:
     // Sets 'exitRequested' to true if the user pressed the exit key.
     bool update(String &line, bool &exitRequested);
 
+    // Command History Persistence
+    void loadHistory(const String &filepath);
+    void saveHistory(const String &filepath);
+    void clearHistoryFile(const String &filepath);
+
 private:
     int16_t _x, _y, _w, _h;
     uint8_t _fontSize;

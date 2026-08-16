@@ -53,10 +53,12 @@ void forthREPL() {
     });
     forth_set_cls([]() { if (_activeConsole) { _activeConsole->clear(); _activeConsole->render(); } });
 
-    // 4. Print welcome greeting
+    // 4. Load persistent command history and print welcome greeting
+    widget.loadHistory("/forth/history.txt");
+
     widget.clear();
     widget.println("uForth 1.2 Console");
-    widget.println("Type 'exit' or 'bye' to return.");
+    widget.println("Type 'bye' (save), 'bye!' (no save), 'bye!!' (wipe)");
     widget.render();
 
     // 5. Main REPL loop
@@ -67,7 +69,20 @@ void forthREPL() {
         vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other RTOS tasks
 
         if (widget.update(line, exitRequested)) {
-            if (line == "exit" || line == "bye") {
+            // Level 3: Wipe history file and exit
+            if (line == "bye!!" || line == "exit!!") {
+                widget.clearHistoryFile("/forth/history.txt");
+                break;
+            }
+
+            // Level 2: Exit without saving current session history
+            if (line == "bye!" || line == "exit!") {
+                break;
+            }
+
+            // Level 1: Save history and exit
+            if (line == "bye" || line == "exit") {
+                widget.saveHistory("/forth/history.txt");
                 break;
             }
 
@@ -99,6 +114,7 @@ void forthREPL() {
         }
 
         if (exitRequested) {
+            widget.saveHistory("/forth/history.txt");
             break;
         }
     }
