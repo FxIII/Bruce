@@ -20,6 +20,11 @@ void forth_set_cls(forth_cls_fn fn);
 void forth_cls(void);
 void forth_set_restore_mode(bool restore);
 
+// Native module registration functions
+void forth_register_core(void);
+void forth_register_display(void);
+void forth_register_block(void);
+
 #ifdef __cplusplus
 }
 #endif
