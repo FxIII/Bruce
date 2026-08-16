@@ -1,5 +1,7 @@
 #include "ConsoleWidget.h"
+#include "sd_functions.h"
 #include <Arduino.h>
+#include <FS.h>
 #include <globals.h>
 
 ConsoleWidget::ConsoleWidget(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t fontSize) {
@@ -297,4 +299,53 @@ bool ConsoleWidget::update(String &line, bool &exitRequested) {
     }
 
     return false;
+}
+
+void ConsoleWidget::loadHistory(const String &filepath) {
+    FS *fs = nullptr;
+    if (!getFsStorage(fs) || !fs->exists(filepath)) return;
+
+    File file = fs->open(filepath, "r");
+    if (!file) return;
+
+    _history.clear();
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        if (!line.isEmpty()) {
+            _history.push_back(line);
+            if (_history.size() > CONSOLE_HISTORY_MAX) {
+                _history.pop_front();
+            }
+        }
+    }
+    file.close();
+    _historyIdx = -1;
+}
+
+void ConsoleWidget::saveHistory(const String &filepath) {
+    FS *fs = nullptr;
+    if (!getFsStorage(fs)) return;
+
+    if (filepath.startsWith("/forth/") && !fs->exists("/forth")) {
+        fs->mkdir("/forth");
+    }
+
+    File file = fs->open(filepath, "w");
+    if (!file) return;
+
+    for (const auto &cmd : _history) {
+        file.println(cmd);
+    }
+    file.close();
+}
+
+void ConsoleWidget::clearHistoryFile(const String &filepath) {
+    _history.clear();
+    _historyIdx = -1;
+
+    FS *fs = nullptr;
+    if (getFsStorage(fs) && fs->exists(filepath)) {
+        fs->remove(filepath);
+    }
 }
