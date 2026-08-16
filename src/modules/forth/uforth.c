@@ -55,10 +55,6 @@ INLINE DCELL dpop(void) { return uforth_uram->ds[uforth_uram->didx--]; }
 INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
 INLINE void rpush(const DCELL w) {
     if (uforth_uram->ridx == (uforth_uram->dsize)) {
-        char err_msg[128];
-        snprintf(err_msg, sizeof(err_msg), " [R-Stack Over] ridx=%d dsize=%d w=%lld\n", 
-                 (int)uforth_uram->ridx, (int)uforth_uram->dsize, (long long)w);
-        uforth_print_str(err_msg);
         uforth_abort_request_details(ABORT_STACKOVER, "return stack", 12);
         return;
     }

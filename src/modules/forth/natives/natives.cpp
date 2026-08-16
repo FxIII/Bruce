@@ -1,5 +1,4 @@
 #include "natives.h"
-#include "core.h"
 #include <Arduino.h>
 
 #define MAX_NATIVES 64
@@ -47,4 +46,6 @@ uforth_stat forth_dispatch(CELL id) {
 
 void forth_register_all() {
     forth_register_core();
+    forth_register_display();
+    forth_register_block();
 }
