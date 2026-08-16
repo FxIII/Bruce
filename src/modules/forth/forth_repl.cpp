@@ -4,9 +4,6 @@
 #include "natives/natives.h"
 #include <Arduino.h>
 
-// Set to 1 to enable session save/load, 0 to always boot clean
-#define FORTH_SESSION_ENABLED 0
-
 struct dict *dict = nullptr;
 static struct dict _dictBuf;
 
@@ -27,110 +24,28 @@ extern "C" void uforth_print_str(const char *s) {
 
 extern "C" void uforth_select_task(CELL uram);
 
-static bool loadForthSession(const char* filepath, FS *fs) {
-    File file = fs->open(filepath, "r");
-    if (!file) return false;
-
-    size_t bytesRead = file.read((uint8_t*)dict, sizeof(struct dict));
-    if (bytesRead != sizeof(struct dict)) {
-        file.close();
-        return false;
-    }
-
-    bytesRead = file.read((uint8_t*)uforth_ram, TOTAL_RAM_CELLS * sizeof(DCELL));
-    if (bytesRead != TOTAL_RAM_CELLS * sizeof(DCELL)) {
-        file.close();
-        return false;
-    }
-    file.close();
-
-    // Validate dict version — if wrong, discard session and delete the bad file
-    if (dict->version != DICT_VERSION || dict->word_size != sizeof(CELL) || dict->max_cells != MAX_DICT_CELLS) {
-        Serial.printf("[Forth] Session version mismatch (ver=%d wordsize=%d maxcells=%d), discarding.\n",
-                      (int)dict->version, (int)dict->word_size, (int)dict->max_cells);
-        fs->remove(filepath);
-        return false;
-    }
-
-    // Restore engine pointers
-    uforth_dict = (CELL*)dict;
-    uforth_iram = (struct uforth_iram*) uforth_ram;
-    uforth_select_task(uforth_iram->curtask_idx);
-
-    // Re-register native functions deterministically without duplicating dictionary words
-    forth_set_restore_mode(true);
-    forth_natives_reset();
-    forth_register_all();
-    forth_set_restore_mode(false);
-
-    log_d("Forth session loaded successfully from %s", filepath);
-
-    return true;
-}
-
-static bool saveForthSession(const char* filepath, FS *fs) {
-    if (!fs->exists("/forth")) {
-        fs->mkdir("/forth");
-    }
-
-    File file = fs->open(filepath, "w");
-    if (!file) return false;
-
-    size_t bytesWritten = file.write((const uint8_t*)dict, sizeof(struct dict));
-    if (bytesWritten != sizeof(struct dict)) {
-        file.close();
-        return false;
-    }
-
-    bytesWritten = file.write((const uint8_t*)uforth_ram, TOTAL_RAM_CELLS * sizeof(DCELL));
-    if (bytesWritten != TOTAL_RAM_CELLS * sizeof(DCELL)) {
-        file.close();
-        return false;
-    }
-    file.close();
-
-    log_d("Forth session saved successfully to %s", filepath);
-    return true;
-}
-
 void forthREPL() {
     // 1. Initialize ConsoleWidget (fullscreen terminal)
     ConsoleWidget widget(0, 0, tftWidth, tftHeight, 1);
     _activeConsole = &widget;
 
-    // 2. Allocate uForth dictionary in PSRAM
-    if (dict == nullptr) {
-        struct dict *d = (struct dict *)ps_malloc(sizeof(struct dict));
-        dict = d ? d : &_dictBuf;
-    }
+    // 2. Use static dictionary buffer in SRAM
+    dict = &_dictBuf;
 
-    // 3. Mount filesystem & load session
-#if FORTH_SESSION_ENABLED
-    FS *fs = nullptr;
-    bool hasStorage = getFsStorage(fs);
-    bool sessionLoaded = false;
+    // 3. Clean boot
+    Serial.println("[Forth] Clean boot");
+    memset(dict, 0, sizeof(struct dict));
+    dict->version   = DICT_VERSION;
+    dict->word_size = sizeof(CELL);
+    dict->max_cells = MAX_DICT_CELLS;
 
-    if (hasStorage && fs->exists("/forth/session.bin")) {
-        sessionLoaded = loadForthSession("/forth/session.bin", fs);
-    }
-    if (!sessionLoaded)
-#endif
-    {
-        // Clean boot
-        Serial.println("[Forth] Clean boot");
-        memset(dict, 0, sizeof(struct dict));
-        dict->version   = DICT_VERSION;
-        dict->word_size = sizeof(CELL);
-        dict->max_cells = MAX_DICT_CELLS;
+    uforth_init();
+    uforth_load_prims();
 
-        uforth_init();
-        uforth_load_prims();
+    forth_natives_reset();
+    forth_register_all();
 
-        forth_natives_reset();
-        forth_register_all();
-
-        uforth_load_core();
-    }
+    uforth_load_core();
 
     forth_set_output([](const char *s) {
         Serial.printf("[OUT] '%s' console=%p\n", s, _activeConsole);
@@ -188,16 +103,6 @@ void forthREPL() {
         }
     }
 
-    // 6. Session save
-#if FORTH_SESSION_ENABLED
-    if (hasStorage) {
-        saveForthSession("/forth/session.bin", fs);
-    }
-#endif
-
     _activeConsole = nullptr;
-    if (dict != &_dictBuf) {
-        free(dict);
-        dict = nullptr;
-    }
+    dict = nullptr;
 }
