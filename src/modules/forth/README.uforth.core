@@ -1,0 +1,112 @@
+# uForth Core Words Reference
+
+Dense reference for uForth standard core words defined in `uforth_core.cpp` (`_core[]`).
+Flags: `IMM` = Immediate (executed during compilation).
+
+| Forth Word | Forth Definition In-Line | Stack Effect | Description / Behavior |
+| :--- | :--- | :--- | :--- |
+| **Data & Return Stack** | | | |
+| `dup` | `: dup 0 pick ;` | `( x -- x x )` | Duplicate top of Data Stack (TOS) |
+| `over` | `: over 1 pick ;` | `( x1 x2 -- x1 x2 x1 )` | Copy 2nd stack item to TOS |
+| `swap` | `: swap >r >r 1 rpick r> r> drop ;` | `( x1 x2 -- x2 x1 )` | Swap top two stack items |
+| `rot` | `: rot >r swap r> swap ;` | `( x1 x2 x3 -- x2 x3 x1 )` | Rotate top 3 stack items to the left |
+| `nip` | `: nip swap drop ;` | `( x1 x2 -- x2 )` | Discard 2nd stack item |
+| `tuck` | `: tuck swap over ;` | `( x1 x2 -- x2 x1 x2 )` | Copy TOS below 2nd stack item |
+| `2dup` | `: 2dup over over ;` | `( x1 x2 -- x1 x2 x1 x2 )` | Duplicate top pair of stack items |
+| `2drop` | `: 2drop drop drop ;` | `( x1 x2 -- )` | Discard top pair of stack items |
+| `r@` | `: r@ 1 rpick ;` | `( -- r_top )` | Copy top of Return Stack to Data Stack |
+| `rdrop` | `: rdrop r> r> drop >r ;` | `( -- )` | Discard top item from Return Stack |
+| **Arithmetic & Logic** | | | |
+| `nop` | `: nop ;` | `( -- )` | No operation |
+| `1+` | `: 1+ 1 + ;` | `( n -- n+1 )` | Increment by 1 |
+| `1-` | `: 1- 1 - ;` | `( n -- n-1 )` | Decrement by 1 |
+| `2+` | `: 2+ 2 + ;` | `( n -- n+2 )` | Increment by 2 |
+| `2*` | `: 2* 2 * ;` | `( n -- n*2 )` | Multiply by 2 (left shift) |
+| `negate` | `: negate invert 1 + ;` | `( n -- -n )` | Two's complement negate |
+| `not` | `: not 0= ;` | `( n -- flag )` | Logical NOT (same as `0=`) |
+| `0<` | `: 0< <0 ;` | `( n -- flag )` | True if n < 0 |
+| `abs` | `: abs dup <0 if negate then ;` | `( n -- \|n\| )` | Absolute value |
+| `dup?` | `: dup? dup 0= 0= if dup then ;` | `( x -- x x \| 0 )` | Duplicate TOS only if non-zero |
+| **Comparison** | | | |
+| `=` | `: = - 0= ;` | `( n1 n2 -- flag )` | True if `n1 == n2` |
+| `<>` | `: <> - 0= invert ;` | `( n1 n2 -- flag )` | True if `n1 != n2` |
+| `<` | `: < - <0 ;` | `( n1 n2 -- flag )` | True if `n1 < n2` |
+| `>` | `: > swap < ;` | `( n1 n2 -- flag )` | True if `n1 > n2` |
+| `0>` | `: 0> 0 > ;` | `( n -- flag )` | True if `n > 0` |
+| `>=` | `: >= - <0 invert ;` | `( n1 n2 -- flag )` | True if `n1 >= n2` |
+| `<=` | `: <= swap >= ;` | `( n1 n2 -- flag )` | True if `n1 <= n2` |
+| `min` | `: min 2dup > if swap then drop ;` | `( n1 n2 -- min )` | Minimum of two values |
+| `max` | `: max 2dup < if swap then drop ;` | `( n1 n2 -- max )` | Maximum of two values |
+| **Memory & Introspection** | | | |
+| `+!` | `: +! dup >r @ + r> ! ;` | `( val addr -- )` | Add value atomically to RAM location |
+| `incr` | `: incr 1 swap +! ;` | `( addr -- )` | Increment RAM location by 1 |
+| `decr` | `: decr -1 swap +! ;` | `( addr -- )` | Decrement RAM location by 1 |
+| `mod` | `: mod over swap dup >r / r> * - ;`| `( n1 n2 -- rem )` | Modulo (`n1 % n2`) |
+| `depth` | `: depth uram 2 + @ 1 + ;` | `( -- n )` | Current Data Stack depth |
+| `CELL` | `: CELL 4 ;` | `( -- 4 )` | Alignment / cell stride constant (4) |
+| `CELL+` | `: CELL+ CELL + ;` | `( addr -- addr+4 )` | Advance address by 1 CELL (4 bytes) |
+| `dversion` | `: dversion 0 dict@ ;` | `( -- ver )` | Fetch dict version (6) |
+| `wordsize` | `: wordsize 1 dict@ ;` | `( -- size )` | Fetch cell byte size (2) |
+| `maxdict` | `: maxdict 2 dict@ ;` | `( -- max )` | Fetch max dict cells (4096) |
+| `_here` | `: _here 3 ;` | `( -- 3 )` | Dict header offset for `here` |
+| `lwa` | `: lwa 4 ;` | `( -- 4 )` | Dict header offset for `last_word_idx` |
+| `iram` | `: iram ram 0 + ;` | `( -- addr )` | IRAM base RAM offset |
+| `compiling?`| `: compiling? 0 iram + @ ;` | `( -- flag )` | Read compiling status flag (0/1) |
+| `ramsize` | `: ramsize 1 iram + @ ;` | `( -- cells )` | Total RAM cells (1024) |
+| `compiling-word-addr` | `: compiling-word-addr 2 iram + @ ;` | `( -- addr )` | Address of word being compiled |
+| `uram-size` | `: uram-size uram 0 + @ ;` | `( -- cells )` | Length of active task URAM |
+| `base` | `: base uram 1 + ;` | `( -- addr )` | RAM address of active numeric base |
+| `sidx` | `: sidx uram 2 + @ ;` | `( -- idx )` | Data Stack top index (`didx`) |
+| `ridx` | `: ridx uram 3 + @ ;` | `( -- idx )` | Return Stack top index (`ridx`) |
+| `dslen` | `: dslen uram 4 + @ ;` | `( -- size )` | Data Stack max size (64 DCELLs) |
+| `rslen` | `: rslen uram 5 + @ ;` | `( -- size )` | Return Stack max size (32 DCELLs) |
+| `dsa` | `: dsa uram 6 + ;` | `( -- addr )` | Base RAM address of stack array `ds[]` |
+| `rsa` | `: rsa dsa dslen + ;` | `( -- addr )` | Base RAM address of Return Stack |
+| `tos` | `: tos dsa sidx + ;` | `( -- addr )` | RAM address of Top of Data Stack |
+| **Control Flow** | | | |
+| `begin` | `: begin here ; immediate` | `( -- dest_addr )` *(IMM)* | Mark start of loop |
+| `until` | `: until 1 , , 18 , ; immediate` | `( dest_addr -- )` *(IMM)* | Loop back if TOS is 0 (compiles `0jmp?`) |
+| `again` | `: again 1 , , 17 , ; immediate` | `( dest_addr -- )` *(IMM)* | Infinite loop back to `begin` (compiles `jmp`) |
+| `if` | `: if 1 , here 0 , 18 , ; immediate` | `( -- orig_addr )` *(IMM)* | Branch if TOS is 0 (compiles `0jmp?`) |
+| `then` | `: then >r here r> dict! ; immediate` | `( orig_addr -- )` *(IMM)* | Backpatch jump target for `if`/`else` |
+| `else` | `: else >r ... 1 , here 0 , 17 , ;` | `( orig_addr -- new_orig )` *(IMM)* | Alternate branch for false condition |
+| `while` | `: while 1 , here 0 , 18 , ; immediate` | `( dest -- dest orig )` *(IMM)* | Intermediate test in `begin ... while` |
+| `repeat` | `: repeat >r 1 , , 17 , here r> dict! ;` | `( dest orig -- )` *(IMM)* | Close `begin ... while ... repeat` loop |
+| `exit` | `: exit 20 , ; immediate` | `( -- )` *(IMM)* | Compile `EXIT` opcode (20) |
+| **Definition Builders & Tick** | | | |
+| `'` | `: ' next-word (find) ;` | `( -- xt )` | Find XT of next word |
+| `[']` | `: ['] next-word (find) 1 , , ;` | `( -- )` *(IMM)* | Compile XT of next word as literal |
+| `[compile]`| `: [compile] postpone ['] ['] , , ;` | `( -- )` *(IMM)* | Force compile next `IMMEDIATE` word |
+| `create` | `: create _create ... lit ... ;` | `( "name" -- )` | Define word pushing its body RAM address |
+| `variable` | `: variable _create ... _allot1 ... ;` | `( "name" -- )` | Allocate variable in RAM (1 DCELL) |
+| `constant` | `: constant _create [compile] lit ... ;` | `( val "name" -- )` | Define 16-bit constant |
+| `dconstant`| `: dconstant _create ... d, ... ;` | `( dval "name" -- )` | Define 32-bit constant |
+| **Bounded Loops (`do ... loop`)** | | | |
+| `do` | `: do [compile] swap >r >r here ;` | `( limit start -- loop_addr )` *(IMM)* | Start loop. Note: Always executed at least once (0-limit entry not checked; wrap in `if ... do ... loop then` if limit can be 0). |
+| `i` | `: i [compile] lit 0 , rpick ;` | `( -- index )` *(IMM)* | Fetch current loop index from RStack |
+| `j` | `: j [compile] lit 2 , rpick ;` | `( -- outer_index )` *(IMM)* | Fetch outer loop index |
+| `leave` | `: leave ... dummy, jmp ;` | `( -- )` *(IMM)* | Reserve forward jump to exit loop (uses single global `_leaveloop` var; nested leaves not supported). |
+| `+loop` | `: +loop ... ; immediate` | `( loop_addr -- )` *(IMM)* | Step index by TOS, loop/exit & patch `leave` |
+| `loop` | `: loop [compile] lit 1 , postpone +loop ;`| `( loop_addr -- )` *(IMM)* | Step index by 1 and loop |
+| `unloop` | `: unloop r> r> drop drop ;` | `( -- )` *(IMM)* | Discard loop parameters from RStack |
+| **Indirection, Allot & Strings** | | | |
+| `defer` | `: defer _create ... _allot1 @ exec ;` | `( "name" -- )` | Define indirect execution word |
+| `is` | `: is ... ; immediate` | `( xt "defer_word" -- )` *(IMM)* | Assign target XT to `defer` word |
+| `allot` | `: allot 0 do _allot1 drop loop ;` | `( n -- )` | Allocate n DCELLs in RAM |
+| `pad` | `variable pad 160 4 / allot` | `( -- addr )` | RAM scratchpad buffer (160 bytes) |
+| `word` | `: word _delim ! 0 pad ! ... ;` | `( char -- pad_addr )` | Read TIB until delimiter into `pad` |
+| `.s` | `: .s depth dup if ... loop then drop ;`| `( -- )` | Print all elements on Data Stack |
+| `type` | `: type 0 begin 2dup +c@ ... emit 1+ ;` | `( addr -- )` | Print null-terminated string |
+
+---
+
+## Category Groupings
+
+- **Stack**: `dup`, `over`, `swap`, `rot`, `nip`, `tuck`, `2dup`, `2drop`, `r@`, `rdrop`
+- **Math/Logic**: `nop`, `1+`, `1-`, `2+`, `2*`, `negate`, `not`, `0<`, `abs`, `dup?`
+- **Comparison**: `=`, `<>`, `<`, `>`, `0>`, `>=`, `<=`, `min`, `max`
+- **Memory/Introspection**: `+!`, `incr`, `decr`, `mod`, `depth`, `CELL`, `CELL+`, `dversion`, `wordsize`, `maxdict`, `_here`, `lwa`, `iram`, `compiling?`, `ramsize`, `compiling-word-addr`, `uram-size`, `base`, `sidx`, `ridx`, `dslen`, `rslen`, `dsa`, `rsa`, `tos`
+- **Control Flow**: `begin`, `until`, `again`, `if`, `then`, `else`, `while`, `repeat`, `exit`
+- **Definition Builders**: `'`, `[']`, `[compile]`, `create`, `variable`, `constant`, `dconstant`
+- **Do Loops**: `do`, `i`, `j`, `leave`, `+loop`, `loop`, `unloop`
+- **Indirection/Strings**: `defer`, `is`, `allot`, `pad`, `word`, `.s`, `type`

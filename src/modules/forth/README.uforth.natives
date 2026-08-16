@@ -1,0 +1,41 @@
+# uForth Native C/C++ Extension System
+
+Architecture and stable core native functions reference for `natives/`.
+
+---
+
+## 1. Architecture & Dispatch Mechanism
+
+uForth connects Forth code to C/C++ functions via opcode `CALLC` (44):
+
+1. **Registration**: `forth_register("name", fn)` assigns a 1-based ID (up to `MAX_NATIVES` = 64), stores `fn` in `_fns[id]`, and calls `forth_define_native("name", id)` which compiles:
+   ```forth
+   : name LIT id CALLC EXIT ;
+   ```
+2. **Dispatch**: When the VM hits `CALLC`, `c_handle()` pops `id` and executes `forth_dispatch(id)` -> `_fns[id]()`.
+3. **Global Module Entry**: `forth_register_all()` inside `natives/natives.cpp` aggregates and initializes all native module registration functions.
+
+---
+
+## 2. Core Native Functions Reference
+
+Stable console I/O, commenting, and dictionary inspection native functions (`natives/core.cpp`).
+
+| Forth Word | C++ Handler | Stack Effect | Description |
+| :--- | :--- | :--- | :--- |
+| `emit` | `fn_emit` | `( char -- )` | Output single ASCII character via `forth_output()` |
+| `cr` | `fn_cr` | `( -- )` | Output a newline (`\n`) |
+| `.` | `fn_dot` | `( n -- )` | Output 64-bit `DCELL` integer followed by a space |
+| `words` | `fn_words` | `( -- )` | Walk dictionary linked list and print all word names |
+| `\` | `fn_line_comment` | `( -- )` *(IMM)* | Line comment: skip TIB input to end of line |
+| `(` | `fn_paren_comment` | `( -- )` *(IMM)* | Block comment: skip TIB input until closing `)` |
+| `key` | `fn_key` | `( -- ascii )` | Blocking key press read (del=8, enter=13, exit=27) |
+
+---
+
+## 3. Extending Native Modules
+
+To add a new native module:
+1. Implement native C++ handlers in a new `.cpp` file in `natives/` (reading/writing stack via `dpop()` / `dpush()`).
+2. Implement a registration function `void forth_register_xxx(void)` invoking `forth_register("forth-name", fn)`.
+3. Declare `forth_register_xxx()` in `natives/natives.h` and invoke it inside `forth_register_all()` in `natives/natives.cpp`.
