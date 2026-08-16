@@ -1,0 +1,51 @@
+# uForth REPL & Console System
+
+Architecture, boot sequence, execution loop, and command history persistence reference for the uForth interactive REPL (`forth_repl.cpp`).
+
+---
+
+## 1. Core Architecture & Memory Layout
+
+- **Dictionary Allocation**: `struct dict` (8 KB / 4096 cells) is allocated statically in internal SRAM (`_dictBuf`).
+- **Terminal UI**: Uses `ConsoleWidget` (`src/core/ConsoleWidget.h`) for fullscreen TFT display rendering, line editing, scrollback buffer, and command history.
+- **C Native Bridge**: 
+  - `c_handle()`: VM `CALLC` opcode (44) handler popping `id` from the stack and calling `forth_dispatch(id)`.
+  - `uforth_print_str()`: Redirects VM print output and stack trace dumps to `ConsoleWidget` or `Serial`.
+
+---
+
+## 2. Boot Sequence
+
+When `forthREPL()` is launched:
+
+1. **Dictionary Initialization**: Formats `dict` with `DICT_VERSION = 6`, `word_size = 2`, `max_cells = 4096`.
+2. **Engine Boot**: Calls `uforth_init()` and `uforth_load_prims()`.
+3. **Native & Core Loading**: Resets & registers all C++ native modules via `forth_register_all()` (`core`, `display`, `block`), then executes `uforth_load_core()`.
+4. **History Load**: Loads persistent command history from `/forth/history.txt` via `widget.loadHistory()`.
+5. **Output Redirection**: Configures `forth_set_output()` and `forth_set_cls()` callbacks to update `ConsoleWidget`.
+
+---
+
+## 3. Main REPL Loop Execution
+
+The interactive loop operates in a `while(true)` loop:
+
+1. **RTOS Yield**: Calls `vTaskDelay(pdMS_TO_TICKS(10))` to yield CPU time to other RTOS tasks.
+2. **Input Polling**: `widget.update(line, exitRequested)` polls keyboard strokes.
+3. **Exit Command Interception**: Intercepts `bye`/`exit`, `bye!`/`exit!`, `bye!!`/`exit!!`, or physical ESC key (`exitRequested`).
+4. **Interpretation**: Copies input line to buffer and calls `uforth_interpret(buf)`.
+5. **Status Handling**:
+   - `UFORTH_OK`: Appends `" ok\n"` to console.
+   - Error (`st != UFORTH_OK`): Prints `uforth_abort_details` or status code, then executes `uforth_abort()`.
+6. **Render**: Calls `widget.render()` to refresh screen TFT buffer.
+
+---
+
+## 4. Tiered Exit Commands & History Persistence
+
+| Exit Command | REPL Behavior | History Persistence (`/forth/history.txt`) |
+| :--- | :--- | :--- |
+| `bye` / `exit` | Exit REPL | **Save & Exit**: Writes updated session history to `/forth/history.txt` |
+| `bye!` / `exit!` | Exit REPL | **No-Save Exit**: Exits without saving (preserves previous disk history) |
+| `bye!!` / `exit!!` | Exit REPL | **Wipe & Exit**: Deletes `/forth/history.txt` from disk & resets history |
+| `ESC` (Physical Key) | Exit REPL | **Save & Exit**: Saves session history to disk and exits to Bruce menu |

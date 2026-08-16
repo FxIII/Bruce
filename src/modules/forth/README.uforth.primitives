@@ -1,0 +1,78 @@
+# uForth Primitives Reference
+
+Dense reference for uForth 54 native primitives defined in `uforth.c` (`uforth_load_prims`).
+Types: `CELL` = 16-bit int (dict), `DCELL` = 64-bit int (RAM/Stack). Flags: `IMM` = Immediate, `PRIM` = Primitive.
+
+> [!CRITICAL ARCHITECTURE CONSTRAINT]
+> `LIT` **must** always remain Opcode `1`. `uforth_core.cpp` hardcodes `1 , ,` inside `[']` to compile literals. Do not reorder enum primitives prior to `LIT`.
+
+| Forth Word | Opcode | Enum Constant | Stack Effect | Description / Internal Logic |
+| :--- | :---: | :--- | :--- | :--- |
+| `lit` | 1 | `LIT` | `( -- n )` | Push inline 16-bit literal from dict `uforth_dict[PC++]` |
+| `dlit` | 2 | `DLIT` | `( -- d )` | Push inline 32-bit literal (reconstructed from 2 cells) |
+| `abort` | 3 | `ABORT` | `( -- )` | Raise explicit `ABORT_WORD` exception, reset VM |
+| `:` | 4 | `DEF` | `( -- )` | Start definition: set `compiling=1`, parse name to dict |
+| `immediate` | 5 | `IMMEDIATE` | `( -- )` | Set `IMMEDIATE_BIT` (0x80) on last defined word |
+| `uram` | 6 | `URAM_BASE_ADDR` | `( -- addr )` | Push active task URAM offset in `DCELL` units |
+| `pick` | 7 | `PICK` | `( n -- x )` | Copy n-th item from Data Stack (`0 pick` = `dup`) |
+| `rpick` | 8 | `RPICK` | `( n -- x )` | Copy n-th item from Return Stack to Data Stack |
+| `here` | 9 | `HERE` | `( -- addr )` | Push dict compilation pointer (`dict->here`) |
+| `dummy,` | 10 | `INCR_HERE` | `( -- )` | Reserve 1 cell in dict (`dict->here += 1`) |
+| `ram` | 11 | `RAM_BASE_ADDR` | `( -- 0 )` | Push RAM base index (0) |
+| `+` | 12 | `ADD` | `( n1 n2 -- sum )` | Add top 2 values (`n1 + n2`) |
+| `-` | 13 | `SUB` | `( n1 n2 -- diff )` | Subtract top value from 2nd (`n1 - n2`) |
+| `*` | 14 | `MULT` | `( n1 n2 -- prod )` | Integer multiplication |
+| `/` | 15 | `DIV` | `( n1 n2 -- quot )` | Integer division (`n1 / n2`) |
+| `and` | 16 | `AND` | `( n1 n2 -- res )` | Bitwise AND |
+| `jmp` | 17 | `JMP` | `( target -- )` | Unconditional jump: `PC = target` |
+| `0jmp?` | 18 | `JMP_IF_ZERO` | `( target cond -- )` | Conditional jump: `PC = target` if `cond == 0` |
+| `0skip?` | 19 | `SKIP_IF_ZERO` | `( offset cond -- )` | Relative skip: `PC += offset` if `cond == 0` |
+| `;` | 20 | `EXIT` | `( -- )` *(IMM)* | Return from word / end definition (`rpop` to PC) |
+| `or` | 21 | `OR` | `( n1 n2 -- res )` | Bitwise OR |
+| `xor` | 22 | `XOR` | `( n1 n2 -- res )` | Bitwise XOR |
+| `lshift` | 23 | `LSHIFT` | `( n c -- n<<c )` | Logical left shift |
+| `rshift` | 24 | `RSHIFT` | `( n c -- n>>c )` | Logical right shift |
+| `0=` | 25 | `EQ_ZERO` | `( n -- flag )` | Push 1 if `n == 0`, else 0 |
+| `drop` | 26 | `DROP` | `( x -- )` | Discard top of Data Stack |
+| `next-word` | 27 | `NEXT` | `( -- pad_addr )` | Parse TIB token to PAD, push `PAD_ADDR` |
+| `next-char` | 28 | `CNEXT` | `( -- char )` | Parse next TIB char as ASCII int |
+| `exec` | 29 | `EXEC` | `( xt -- )` | Push return PC to RStack, jump to execution token `xt` |
+| `<0` | 30 | `LESS_THAN_ZERO`| `( n -- flag )` | Push 1 if `n < 0`, else 0 |
+| `make-task` | 31 | `MAKE_TASK` | `( u ds rs ram -- id )` | Init task URAM structure in RAM |
+| `select-task`| 32 | `SELECT_TASK` | `( uram -- )` | Set active task `uforth_uram` pointer |
+| `invert` | 33 | `INVERT` | `( n -- ~n )` | Bitwise NOT (one's complement) |
+| `,` | 34 | `COMMA` | `( cell -- )` | Write `CELL` (16b) to `dict[here++]` |
+| `d,` | 35 | `DCOMMA` | `( dcell -- )` | Write 32-bit int as 2 cells to dict |
+| `>r` | 36 | `RPUSH` | `( x -- )` `[R: -- x]` | Move value from Data Stack to Return Stack |
+| `r>` | 37 | `RPOP` | `( -- x )` `[R: x -- ]` | Move value from Return Stack to Data Stack |
+| `@` | 38 | `FETCH` | `( ram_addr -- dcell )` | Read `DCELL` (64b) from `uforth_ram[addr]` |
+| `!` | 39 | `STORE` | `( val ram_addr -- )` | Write `DCELL` (64b) to `uforth_ram[addr]` |
+| `dict@` | 40 | `DICT_FETCH` | `( dict_addr -- cell )` | Read `CELL` (16b) from `uforth_dict[addr]` |
+| `dict!` | 41 | `DICT_STORE` | `( val dict_addr -- )` | Write `CELL` (16b) to `uforth_dict[addr]` |
+| `,"` | 42 | `COMMA_STRING` | `( "str" -- )` *(IMM)* | Compile packed string to dict (adds jump if compiling) |
+| `_allot1` | 43 | `VAR_ALLOT` | `( -- ram_addr )` | Allocate 1 `DCELL` in RAM, push RAM index |
+| `cf` | 44 | `CALLC` | `( -- stat )` | Execute native C extension handler `c_handle()` |
+| `(find)` | 45 | `FIND` | `( cstr_addr -- xt )` | Find word from RAM counted-str, push XT/opcode or 0 |
+| `(find&)` | 46 | `FIND_ADDR` | `( cstr_addr -- lwa )` | Find word, push dict header (LWA) index |
+| `c!+` | 47 | `CHAR_APPEND` | `( char cstr -- )` | Append byte to RAM counted-str & inc len |
+| `+c@` | 48 | `CHAR_FETCH` | `( base off -- byte )` | Read byte from RAM at `base + offset` |
+| `+c!` | 49 | `CHAR_STORE` | `( char base off -- )` | Write byte to RAM at `base + offset` |
+| `+dict-c@` | 50 | `DCHAR_FETCH` | `( base off -- byte )` | Read byte from Dict at `base + offset` |
+| `postpone` | 51 | `POSTPONE` | `( -- )` *(IMM)* | Compile XT of next word (for macro building) |
+| `_create` | 52 | `_CREATE` | `( -- )` | Build word header in dict without enabling compiling mode |
+| `>num` | 53 | `PARSE_NUM` | `( cstr_addr -- num )` | Parse RAM counted-str to int/fixed in active base |
+| `>fnum` | 54 | `PARSE_FNUM` | `( cstr_addr -- fnum )`| Append `.` to RAM counted-str & parse fixed-point float |
+
+---
+
+## Category Groupings
+
+- **Stack**: `drop` (26), `pick` (7), `>r` (36), `r>` (37), `rpick` (8)
+- **Math/Bitwise**: `+` (12), `-` (13), `*` (14), `/` (15), `and` (16), `or` (21), `xor` (22), `invert` (33), `lshift` (23), `rshift` (24)
+- **Logic**: `0=` (25), `<0` (30)
+- **Memory**: `@` (38), `!` (39), `dict@` (40), `dict!` (41), `+c@` (48), `+c!` (49), `+dict-c@` (50), `c!+` (47), `ram` (11), `uram` (6)
+- **Control**: `jmp` (17), `0jmp?` (18), `0skip?` (19), `exec` (29), `;` (20), `abort` (3)
+- **Dict/Compile**: `:` (4), `_create` (52), `immediate` (5), `here` (9), `,` (34), `d,` (35), `dummy,` (10), `postpone` (51), `,"` (42), `_allot1` (43), `lit` (1), `dlit` (2)
+- **Text/Parsing**: `next-word` (27), `next-char` (28), `>num` (53), `>fnum` (54), `(find)` (45), `(find&)` (46)
+- **Tasks**: `make-task` (31), `select-task` (32)
+- **C-Binding**: `cf` (44)

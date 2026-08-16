@@ -1,0 +1,226 @@
+# Guida e Analisi Dettagliata di uForth (uforth.c, uforth.h, uforth-config.h)
+
+Questo documento contiene l'analisi tecnica completa del modulo **uForth**, un interprete/compilatore Forth-like leggero ed efficiente progettato per microcontrollori (es. ESP32-S3 / Cardputer nel firmware Bruce).
+
+---
+
+## 1. Come Funzionano (Architettura e Modello di Esecuzione)
+
+uForth è una Macchina Virtuale basata su **Threaded Code** guidata da **Opcode** numerici. Funziona sia come interprete di comandi interattivi che come compilatore di nuove parole Forth.
+
+### A. Ciclo di Esecuzione e Interprete (`uforth_interpret`)
+L'ingresso principale per l'esecuzione del codice è la funzione [`uforth_interpret(const char *str)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L612).
+
+1. **Popolamento TIB**:
+   - Pulisce lo stato del buffer di input via `CLEAR_TIB()`.
+   - Copia la stringa in ingresso nel *Text Input Buffer* (`uforth_iram->tib`) fino a un massimo di `TIB_SIZE` byte (128 char).
+   > [!WARNING]
+   > **TIB Truncation Constraint**: `TIB_SIZE` è fisso a 128 byte. Qualsiasi stringa o comando inviato a `uforth_interpret()` più lungo di 128 byte viene **silenziosamente troncato**. I blocchi di codice Forth multilinea o lunghi devono essere spezzati in stringhe singole di lunghezza inferiore a 128 byte.
+2. **Tokenizzazione**:
+   - [`uforth_next_word()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L129) analizza il TIB ed estrae una parola alla volta separata da spazi.
+3. **Ricerca nel Dizionario**:
+   - [`find_word()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L591) cerca se il token esiste nella lista concatenata a ritroso del Dizionario.
+
+#### Modalità Interprete (`uforth_iram->compiling == 0`):
+- **Parola Trovata (`wd_idx != 0`)**:
+  - Invoca [`exec(wd_idx, primitive, uforth_uram->ridx - 1)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L272).
+  - **Se Primitiva (`primitive == 1`)**: Esegue direttamente l'opcode nativo nel C `switch` e ritorna immediatamente `UFORTH_OK`.
+  - **Se Parola Utente (`primitive == 0`)**: Entra nel loop di interpretazione a threaded-code della VM, eseguendo in sequenza le celle che compongono la parola finché non incontra l'opcode `EXIT` (20) o un errore.
+  - Se `exec()` restituisce uno stato di errore diverso da `UFORTH_OK`, `uforth_interpret` esegue [`uforth_abort()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L140), pulisce il flag di abort con `uforth_abort_clr()` e ritorna il codice d'errore (`stat`).
+- **Parola NON Trovata (`wd_idx == 0`)**:
+  - Tenta il parsing numerico con [`parse_num(word, uforth_uram->base)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L94). Supporta basi decimali (base 10), esadecimali e numeri a punto fisso/virgola mobile se attivata la macro `SUPPORT_FLOAT_FIXED`.
+  - **Se Numero Valido**: Lo inserisce nello stack dati come intero a 32-bit usando [`dpush32(num)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L67).
+  - **Se NON è un numero valido**: Genera una richiesta di abort `ABORT_NAW` (*Not A Word*) salvando i dettagli del token errato via `uforth_abort_request_details`, invoca `uforth_abort()` e ritorna `E_NOT_A_WORD`.
+
+#### Modalità Compilazione (`uforth_iram->compiling == 1`):
+- Viene attivata dalla parola `:` (opcode `DEF`).
+- Se il token è la parola `;`, disattiva la compilazione (`compiling = 0`), compila l'opcode `EXIT` e chiude la definizione via `dict_end_def()`.
+- Se la parola ha il bit **`IMMEDIATE_BIT`** impostato (es. `;`, `if`, `then`, `else`, `begin`, `postpone`), viene **eseguita immediatamente** durante la compilazione.
+- Se la parola è una **Primitiva**, compila direttamente il suo Opcode nel dizionario (`dict_append(uforth_dict[wd_idx])`).
+- Se è una **Parola Utente**, ne compila l'indirizzo di ingresso (`wd_idx`) (o la sequenza `LIT compiling_word JMP` in caso di ricorsione).
+- Se è un **Numero**, compila l'opcode `DLIT` seguito dai 32 bit del valore suddivisi in due celle da 16 bit.
+
+### B. La Macchina Virtuale (`exec`)
+La funzione [`exec()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L272) è il motore di esecuzione:
+- Legge l'opcode: `cmd = uforth_dict[wd_idx++]`.
+- **Opcode Primitivo (`1` <= `cmd` <= `LAST_PRIMITIVE`)**: Un’istruzione `switch (cmd)` esegue l'operazione in C (es. `ADD`, `SUB`, `FETCH`, `STORE`, `LIT`, `JMP`, `CALLC`, `FIND`, ecc.).
+- **Parola Composta (`cmd > LAST_PRIMITIVE`)**: Salva il Program Counter corrente sul Return Stack (`rpush(wd_idx)`) e salta al corpo della nuova parola (`wd_idx = uforth_dict[wd_idx-1]`).
+- **Opcode `EXIT` (20)**: Ripristina l'indirizzo di ritorno dal Return Stack (`wd_idx = rpop()`).
+
+---
+
+## 2. Come viene Mappata la Memoria (Dimensioni in Celle e Byte)
+
+La memoria è suddivisa in **RAM** ([`uforth_ram`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.h#L64)) per lo stato di esecuzione e gli stack, e **Dizionario** ([`dict`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.h#L63)) per il codice e le definizioni.
+
+### Unità di Misura della Memoria
+- **`CELL`** ([`uforth.h:9`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.h#L9)): `uint16_t` = **2 Byte** per cella (usato nel Dizionario).
+- **`DCELL`** ([`uforth.h:10`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.h#L10)): `int64_t` = **8 Byte** per cella (usato nella RAM e negli Stack).
+
+---
+
+### A. Layout e Dimensioni della RAM (`uforth_ram[]`)
+Dimensione Totale: `TOTAL_RAM_CELLS` = **1024 celle DCELL** = **8192 Byte (8 KB)**.
+
+```
++---------------------------------------------------------------------------------+
+|  IRAM (struct uforth_iram)                                                      |
+|  Dimensione: 24 celle DCELL = 192 Byte                                          |
++---------------------------------------------------------------------------------+
+|  URAM (struct uforth_uram) - Task 0                                             |
+|  Dimensione: 150 celle DCELL = 1200 Byte                                        |
+|  - Header URAM: 6 celle DCELL = 48 Byte                                         |
+|  - Array Unificato ds[] (96 celle DCELL = 768 Byte):                            |
+|      [ Data Stack (DS): 64 celle DCELL = 512 Byte (cresce 0 -> didx) ]           |
+|      [ Return Stack (RS): 32 celle DCELL = 256 Byte (cresce 95 <- ridx) ]        |
++---------------------------------------------------------------------------------+
+|  Spazio Utente / Altri Task / Variabili Utente (VAR_ALLOT)                       |
+|  Dimensione: 786 celle DCELL = 6288 Byte (6.14 KB)                              |
++---------------------------------------------------------------------------------+
+|  PAD Buffer (Scratchpad in fondo alla RAM)                                      |
+|  Dimensione: 64 celle DCELL = 512 Byte                                          |
++---------------------------------------------------------------------------------+
+```
+
+> [!IMPORTANT]
+> **Hard Stack Boundaries in `ds[]`**: L'array unificato `ds[]` ha frontiere rigide pre-allocate (`TASK0_DS_CELLS` = 64, `TASK0_RS_CELLS` = 32). Il Data Stack va in overflow se `didx >= 64`, indipendentemente dal fatto che il Return Stack sia vuoto o occupato.
+
+#### Dettaglio delle Sottoregioni della RAM:
+
+1. **IRAM (`struct uforth_iram`)**:
+   - Posizione: Inizio dell'array `uforth_ram` (`uforth_ram[0]`).
+   - Dimensione: **24 celle DCELL** = **192 Byte** (`IRAM_BYTES = 24`).
+   - Composizione:
+     - `DCELL compiling`: 1 cella DCELL (8 Byte)
+     - `DCELL total_ram`: 1 cella DCELL (8 Byte)
+     - `DCELL compiling_word`: 1 cella DCELL (8 Byte)
+     - `DCELL curtask_idx`: 1 cella DCELL (8 Byte)
+     - `DCELL tibidx`: 1 cella DCELL (8 Byte)
+     - `DCELL tibclen`: 1 cella DCELL (8 Byte)
+     - `DCELL tibwordidx`: 1 cella DCELL (8 Byte)
+     - `DCELL tibwordlen`: 1 cella DCELL (8 Byte)
+     - `char tib[TIB_SIZE]`: `TIB_SIZE = 128` char = 128 Byte = 16 celle DCELL (128 / 8 = 16 celle DCELL).
+
+2. **URAM Task 0 (`struct uforth_uram`)**:
+   - Posizione: Mappata a partire dall'offset `IRAM_BYTES` (cella DCELL 24).
+   - Dimensione Totale: `TASK0_URAM_CELLS` = **150 celle DCELL** = **1200 Byte**.
+   - Composizione:
+     - Header (`len`, `base`, `didx`, `ridx`, `dsize`, `rsize`): **6 celle DCELL** = **48 Byte** (`URAM_HDR_BYTES = 6`).
+     - `dsize`: Impostato a `TASK0_DS_CELLS = 64` celle DCELL.
+     - `rsize`: Impostato a `TASK0_RS_CELLS = 32` celle DCELL.
+     - Array Unificato `ds[]`: **96 celle DCELL** = **768 Byte** (`TASK0_DS_CELLS + TASK0_RS_CELLS`).
+       - **Data Stack (DS)**: 64 celle DCELL = **512 Byte** (cresce da 0 verso l'alto).
+       - **Return Stack (RS)**: 32 celle DCELL = **256 Byte** (cresce dall'indice 95 verso il basso).
+
+3. **Spazio Variabili Utente / Altri Task (`VAR_ALLOT`)**:
+   - Dimensione Disponibile: `1024 - 24 (IRAM) - 150 (URAM) - 64 (PAD)` = **786 celle DCELL** = **6288 Byte (6.14 KB)**.
+   - Utilizzato per variabili definite con `_allot1` / `VAR_ALLOT(n)` e per nuovi task creati con `make-task`.
+
+4. **PAD Buffer**:
+   - Posizione: Alla fine della RAM (`PAD_ADDR = total_ram - PAD_SIZE` = cella DCELL 960).
+   - Dimensione: `PAD_SIZE` = **64 celle DCELL** = **512 Byte**.
+   - `PAD_STRLEN`: Memorizzato in `uforth_ram[960]` (1 cella DCELL).
+   - `PAD_STR`: Puntatore char a `uforth_ram[961]` (504 byte utili per memorizzare stringhe temporanee).
+
+---
+
+### B. Layout e Dimensioni del Dizionario (`dict` / `uforth_dict[]`)
+Dimensione Totale: `MAX_DICT_CELLS` = **4096 celle CELL** = **8192 Byte (8 KB)**.
+
+#### 1. Header Globale del Dizionario (`struct dict`)
+Le prime 6 celle `CELL` sono riservate alla struttura di controllo:
+- Dimensione: **6 celle CELL** = **12 Byte** (`DICT_HEADER_WORDS = 5` info header + 1 cella `varidx`).
+- Composizione:
+  - `dict->version` (cella 0): `DICT_VERSION = 6` (2 Byte)
+  - `dict->word_size` (cella 1): `sizeof(CELL) = 2` (2 Byte)
+  - `dict->max_cells` (cella 2): `MAX_DICT_CELLS = 4096` (2 Byte)
+  - `dict->here` (cella 3): Indice alla prima cella libera (inizializzato a `DICT_HEADER_WORDS + 1 = 6`) (2 Byte)
+  - `dict->last_word_idx` (cella 4): Indice della testa della lista concatenata (LWA) (2 Byte)
+  - `dict->varidx` (cella 5): Offset progressivo delle variabili in RAM (2 Byte)
+
+#### 2. Struttura di una Parola (Word Entry Header)
+Ogni parola registrata nel dizionario ha la seguente struttura in celle `CELL`:
+
+```
++-------------------+--------------------+--------------------+-----------------------+
+| Link Pointer      | Length & Flags     | Name String        | Body / Execution Token|
+| 1 CELL (2 Byte)   | 1 CELL (2 Byte)    | N CELLs (2*N Byte) | M CELLs (2*M Byte)    |
++-------------------+--------------------+--------------------+-----------------------+
+```
+
+- **Link Pointer**: 1 cella CELL (2 Byte). Indice `uforth_dict` alla parola precedente.
+- **Length & Flags**: 1 cella CELL (2 Byte).
+  - Bit 0..5 (`0x3F`): Lunghezza stringa (max 63 byte).
+  - Bit 6 (`PRIM_BIT = 0x40`): Flag Primitiva Nativa.
+  - Bit 7 (`IMMEDIATE_BIT = 0x80`): Flag Parola Immediate.
+- **Name String**: `ceil(len / 2)` celle CELL (ogni cella ospita 2 caratteri char).
+- **Body / Execution Token**:
+  - *Primitiva Nativa*: **2 celle CELL** (4 Byte) -> Opcode Nativo + `EXIT` (20).
+  - *Nativa C (`forth_define_native`)*: **4 celle CELL** (8 Byte) -> `LIT <id> CALLC EXIT`.
+  - *Definizione Utente*: N celle CELL contenenti opcodes, literali `DLIT val_hi val_lo` (3 celle), indici o salti, terminata da `EXIT`.
+
+---
+
+## 3. Come sono Mappati gli Errori (Error Handling & Abort System)
+
+Il sistema di gestione degli errori combina **Codici di Stato (`uforth_stat`)**, **Tipi di Abort (`abort_t`)** e il dump automatico dello stack trace.
+
+### A. Codici di Stato (`uforth_stat`)
+Definiti nell'enum in [`uforth.h:16`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.h#L16):
+
+| Enum Status | Valore | Descrizione |
+| :--- | :---: | :--- |
+| `UFORTH_OK` | 0 | Esecuzione completata correttamente. |
+| `E_NOT_A_WORD` | 1 | Token non trovato nel dizionario e non parsabile come numero. |
+| `E_STACK_UNDERFLOW` | 2 | Tentativo di estrarre valori da uno stack vuoto. |
+| `E_RSTACK_OVERFLOW` | 3 | Overflow del Return Stack. |
+| `E_DSTACK_OVERFLOW` | 4 | Overflow del Data Stack. |
+| `E_ABORT` | 5 | Condizione di Abort generica o istruzione `abort` eseguita. |
+| `E_EXIT` | 6 | Richiesta di uscita. |
+
+---
+
+### B. Tipi di Abort (`abort_t`)
+Definiti nell'enum in [`uforth.h:66`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.h#L66):
+
+```c
+typedef enum {
+    NO_ABORT = 0,
+    ABORT_CTRL_C = 1,     // Interruzione manuale/utente
+    ABORT_NAW = 2,        // Parola non trovata (Not A Word)
+    ABORT_ILLEGAL = 3,    // Opcode o indirizzo dizionario illegale (es. wd_idx == 0)
+    ABORT_WORD = 4,       // Parola Forth 'abort' invocata esplicitamente
+    ABORT_STACKOVER = 5   // Overflow di uno degli stack
+} abort_t;
+```
+
+#### Dettagli e Macro per gli Errori
+- **`_uforth_abort_request`**: Variabile globale di tipo `abort_t`.
+- **`uforth_abort_details[64]`**: Buffer di 64 byte contenente informazioni di contesto sull'errore (es. nome della parola fallita o l'indice fuori limite).
+- **Macro helper**:
+  - `uforth_abort_request(why)`: Imposta la ragione dell'abort.
+  - `uforth_abort_request_details(why, word_ptr, len)`: Copia fino a 63 caratteri del token errato in `uforth_abort_details`.
+  - `uforth_abort_request_val(why, format, val)`: Formatta una stringa di dettaglio (es. `"idx %d"`).
+
+---
+
+### C. Procedura di Recovery e Stack Trace (`uforth_abort`)
+La funzione [`uforth_abort()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L140) viene eseguita quando si verifica un abort:
+
+1. **Dump dello Stack Trace**:
+   Stampa sul canale di output la traccia degli indirizzi di ritorno salvati nel Return Stack (`R-Stack: ...`), permettendo di identificare la sequenza di chiamate fino al punto di fallimento.
+2. **Ripristino dello Stato di Compilazione**:
+   Se l'errore è avvenuto durante la compilazione (`compiling == 1`), inserisce l'opcode `ABORT` nel dizionario e disattiva la compilazione (`compiling = 0`).
+3. **Reset degli Stack**:
+   Ripristina istantaneamente i puntatori degli stack allo stato vuoto e pulito:
+   - `uforth_uram->ridx = uforth_uram->rsize + uforth_uram->dsize;` (Reset Return Stack)
+   - `uforth_uram->didx = -1;` (Reset Data Stack)
+4. **Control Flow Recovery**:
+   Al termine di ogni istruzione nel ciclo `CHECK_STAT` di [`exec()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L582):
+   ```c
+   if (uforth_aborting()) {
+       uforth_abort();
+       return E_ABORT;
+   }
+   ```
+   L'abort interrompe immediatamente l'esecuzione nidificata e restituisce il controllo all'interprete o alla REPL, evitando crash del sistema, deadlock o memory corruption.
