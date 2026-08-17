@@ -82,6 +82,31 @@ static void fn_paren_comment() {
     }
 }
 
+static void fn_ms() {
+    uint32_t ms = (uint32_t)dpop();
+    if (ms > 0) {
+        vTaskDelay(pdMS_TO_TICKS(ms));
+    }
+}
+
+static void fn_us() {
+    uint32_t us = (uint32_t)dpop();
+    if (us > 0) {
+        delayMicroseconds(us);
+    }
+}
+
+static void fn_key_query() {
+    keyStroke ks = _getKeyPress();
+    if (ks.pressed) {
+        if (ks.del) { dpush(8); return; }
+        if (ks.enter) { dpush(13); return; }
+        if (!ks.word.empty()) { dpush((uint8_t)ks.word[0]); return; }
+        if (ks.exit_key) { dpush(27); return; }
+    }
+    dpush(0);
+}
+
 void forth_register_core() {
     forth_register("emit", fn_emit);
     forth_register("cr", fn_cr);
@@ -90,4 +115,7 @@ void forth_register_core() {
     forth_register("\\", fn_line_comment); make_immediate();
     forth_register("(", fn_paren_comment); make_immediate();
     forth_register("key", fn_key);
+    forth_register("key?", fn_key_query);
+    forth_register("ms", fn_ms);
+    forth_register("us", fn_us);
 }
