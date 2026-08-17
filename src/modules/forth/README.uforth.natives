@@ -30,6 +30,9 @@ Stable console I/O, commenting, and dictionary inspection native functions (`nat
 | `\` | `fn_line_comment` | `( -- )` *(IMM)* | Line comment: skip TIB input to end of line |
 | `(` | `fn_paren_comment` | `( -- )` *(IMM)* | Block comment: skip TIB input until closing `)` |
 | `key` | `fn_key` | `( -- ascii )` | Blocking key press read (del=8, enter=13, exit=27) |
+| `key?` | `fn_key_query` | `( -- ascii \| 0 )` | Non-blocking key press check (returns ASCII code or 0) |
+| `ms` | `fn_ms` | `( ms -- )` | Non-blocking RTOS delay in milliseconds (`vTaskDelay`) |
+| `us` | `fn_us` | `( us -- )` | Microsecond delay (`delayMicroseconds`) |
 
 ---
 
