@@ -43,9 +43,10 @@ void forthREPL() {
     uforth_load_prims();
 
     forth_natives_reset();
-    forth_register_all();
+    forth_natives_register_bindings();
 
     uforth_load_core();
+    forth_natives_register_definitions();
 
     forth_set_output([](const char *s) {
         Serial.printf("[OUT] '%s' console=%p\n", s, _activeConsole);

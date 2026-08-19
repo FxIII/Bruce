@@ -20,7 +20,7 @@ When `forthREPL()` is launched:
 
 1. **Dictionary Initialization**: Formats `dict` with `DICT_VERSION = 6`, `word_size = 2`, `max_cells = 4096`.
 2. **Engine Boot**: Calls `uforth_init()` and `uforth_load_prims()`.
-3. **Native & Core Loading**: Resets & registers all C++ native modules via `forth_register_all()` (`core`, `display`, `block`), then executes `uforth_load_core()`.
+3. **Native & Core Loading**: Resets & registers C++ native primitives via `forth_natives_register_bindings()`, executes `uforth_load_core()` to populate standard Forth words, and then registers post-core native word definitions via `forth_natives_register_definitions()`.
 4. **History Load**: Loads persistent command history from `/forth/history.txt` via `widget.loadHistory()`.
 5. **Output Redirection**: Configures `forth_set_output()` and `forth_set_cls()` callbacks to update `ConsoleWidget`.
 
