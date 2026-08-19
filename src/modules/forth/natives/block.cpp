@@ -1,4 +1,4 @@
-#include "natives.h"
+#include "natives_internal.h"
 #include "../uforth.h"
 #include "core/sd_functions.h"
 #include <Arduino.h>
@@ -152,7 +152,7 @@ static void fn_block_interpret() {
     file.close();
 }
 
-void forth_register_block() {
+void block_bindings() {
     forth_register("load", fn_block_interpret);
     forth_register("br.block.read", fn_block_read);
     forth_register("br.block.write", fn_block_write);

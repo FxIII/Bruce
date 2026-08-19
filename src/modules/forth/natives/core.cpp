@@ -1,4 +1,4 @@
-#include "natives.h"
+#include "natives_internal.h"
 #include "../uforth.h"
 #include "core/mykeyboard.h"
 #include <Arduino.h>
@@ -107,7 +107,7 @@ static void fn_key_query() {
     dpush(0);
 }
 
-void forth_register_core() {
+void core_bindings() {
     forth_register("emit", fn_emit);
     forth_register("cr", fn_cr);
     forth_register(".", fn_dot);
@@ -118,4 +118,8 @@ void forth_register_core() {
     forth_register("key?", fn_key_query);
     forth_register("ms", fn_ms);
     forth_register("us", fn_us);
+}
+
+void core_definitions() {
+    uforth_interpret(": count dup 1+ swap c@ ;");
 }

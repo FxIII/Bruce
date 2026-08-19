@@ -1,4 +1,4 @@
-#include "natives.h"
+#include "natives_internal.h"
 #include <Arduino.h>
 
 #define MAX_NATIVES 64
@@ -44,8 +44,14 @@ uforth_stat forth_dispatch(CELL id) {
     return UFORTH_OK;
 }
 
-void forth_register_all() {
-    forth_register_core();
-    forth_register_display();
-    forth_register_block();
+// Phase 1: Aggregates internal C++ binding registrations before core load
+void forth_natives_register_bindings() {
+    core_bindings();
+    display_bindings();
+    block_bindings();
+}
+
+// Phase 2: Aggregates internal Forth word definition registrations after core load
+void forth_natives_register_definitions() {
+    core_definitions();
 }

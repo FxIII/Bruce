@@ -1,4 +1,4 @@
-#include "natives.h"
+#include "natives_internal.h"
 #include "../uforth.h"
 #include "core/display.h"
 #include <Arduino.h>
@@ -45,7 +45,7 @@ static void fn_draw_cursor() {
     tft.fillRect(x * 6, y * 8 + 6, 6, 2, bruceConfig.priColor);
 }
 
-void forth_register_display() {
+void display_bindings() {
     forth_register("br.display.cls", fn_cls);
     forth_register("br.display.writeLine", fn_write_line);
     forth_register("br.display.drawCursor", fn_draw_cursor);

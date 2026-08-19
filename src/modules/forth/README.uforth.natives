@@ -2,6 +2,9 @@
 
 Architecture and stable core native functions reference for `natives/`.
 
+> [!NOTE]
+> Questa documentazione descrive unicamente l'architettura generale ed il modulo nativo principale (`natives/core.cpp`). Per consultare le altre funzioni native disponibili (es. `display.cpp`, `block.cpp`, ecc.), fare riferimento direttamente ai rispettivi file `.cpp` nella cartella `natives/`. Non occorre aggiornare questo documento quando si aggiungono o estendono nuovi moduli nativi.
+
 ---
 
 ## 1. Architecture & Dispatch Mechanism
@@ -13,13 +16,15 @@ uForth connects Forth code to C/C++ functions via opcode `CALLC` (44):
    : name LIT id CALLC EXIT ;
    ```
 2. **Dispatch**: When the VM hits `CALLC`, `c_handle()` pops `id` and executes `forth_dispatch(id)` -> `_fns[id]()`.
-3. **Global Module Entry**: `forth_register_all()` inside `natives/natives.cpp` aggregates and initializes all native module registration functions.
+3. **Two-Phase Registration**:
+   - `forth_natives_register_bindings()` inside `natives/natives.cpp` aggregates primitive C++ bindings before `uforth_load_core()`.
+   - `forth_natives_register_definitions()` inside `natives/natives.cpp` aggregates high-level Forth word definitions (via `uforth_interpret()`) after `uforth_load_core()`.
 
 ---
 
 ## 2. Core Native Functions Reference
 
-Stable console I/O, commenting, and dictionary inspection native functions (`natives/core.cpp`).
+Stable console I/O, commenting, timing, and dictionary inspection native functions (`natives/core.cpp`).
 
 | Forth Word | C++ Handler | Stack Effect | Description |
 | :--- | :--- | :--- | :--- |
@@ -34,11 +39,17 @@ Stable console I/O, commenting, and dictionary inspection native functions (`nat
 | `ms` | `fn_ms` | `( ms -- )` | Non-blocking RTOS delay in milliseconds (`vTaskDelay`) |
 | `us` | `fn_us` | `( us -- )` | Microsecond delay (`delayMicroseconds`) |
 
+### High-Level Core Definitions (`core_definitions`)
+| Forth Word | Forth Definition | Stack Effect | Description |
+| :--- | :--- | :--- | :--- |
+| `count` | `: count dup 1+ swap c@ ;` | `( cstr -- addr len )` | Convert counted string (`cstr`) to standard Forth `( addr len )` pair |
+
 ---
 
 ## 3. Extending Native Modules
 
 To add a new native module:
-1. Implement native C++ handlers in a new `.cpp` file in `natives/` (reading/writing stack via `dpop()` / `dpush()`).
-2. Implement a registration function `void forth_register_xxx(void)` invoking `forth_register("forth-name", fn)`.
-3. Declare `forth_register_xxx()` in `natives/natives.h` and invoke it inside `forth_register_all()` in `natives/natives.cpp`.
+1. Implement native C++ binding handlers in a new `.cpp` file in `natives/` (reading/writing stack via `dpop()` / `dpush()`).
+2. Implement `xxx_bindings(void)` to register primitive C++ handlers via `forth_register("forth-name", fn)`.
+3. *(Optional)* Implement `xxx_definitions(void)` for high-level Forth word definitions (using `uforth_interpret()`).
+4. Declare internal contract functions in `natives/natives_internal.h` and invoke them inside `forth_natives_register_bindings()` / `forth_natives_register_definitions()` in `natives/natives.cpp`.
