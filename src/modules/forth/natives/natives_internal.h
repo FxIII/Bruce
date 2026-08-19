@@ -19,6 +19,10 @@ void display_bindings(void);
 
 void block_bindings(void);
 
+void reactor_bindings(void);
+void reactor_definitions(void);
+void forth_reactor_step(void);
+
 #ifdef __cplusplus
 }
 #endif

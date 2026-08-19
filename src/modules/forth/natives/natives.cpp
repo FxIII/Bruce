@@ -49,9 +49,11 @@ void forth_natives_register_bindings() {
     core_bindings();
     display_bindings();
     block_bindings();
+    reactor_bindings();
 }
 
 // Phase 2: Aggregates internal Forth word definition registrations after core load
 void forth_natives_register_definitions() {
     core_definitions();
+    reactor_definitions();
 }
