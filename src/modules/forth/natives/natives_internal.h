@@ -23,6 +23,9 @@ void reactor_bindings(void);
 void reactor_definitions(void);
 void forth_reactor_step(void);
 
+void lora_bindings(void);
+void lora_definitions(void);
+
 #ifdef __cplusplus
 }
 #endif
