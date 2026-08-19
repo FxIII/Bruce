@@ -121,5 +121,5 @@ void core_bindings() {
 }
 
 void core_definitions() {
-    uforth_interpret(": count dup 1+ swap c@ ;");
+    uforth_interpret(": count dup 1+ swap 0 +c@ ;");
 }

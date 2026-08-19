@@ -6,6 +6,7 @@
 
 struct dict *dict = nullptr;
 static struct dict _dictBuf;
+static bool _consoleDirty = false;
 
 extern "C" uforth_stat c_handle(void) {
     return forth_dispatch((CELL)dpop());
@@ -21,6 +22,7 @@ ConsoleWidget* getActiveConsoleWidget() {
 extern "C" void uforth_print_str(const char *s) {
     if (_activeConsole) {
         _activeConsole->print(s);
+        _consoleDirty = true;
     } else {
         Serial.print(s);
     }
@@ -56,11 +58,7 @@ bool forth_repl_step_once(ConsoleWidget* widget) {
         strncpy(buf, line.c_str(), sizeof(buf) - 1);
         buf[sizeof(buf) - 1] = '\0';
 
-        Serial.printf("[REPL] interpret: '%s'\n", buf);
-
         uforth_stat st = uforth_interpret(buf);
-
-        Serial.printf("[REPL] result: %d\n", (int)st);
 
         if (st == UFORTH_OK) {
             widget->print(" ok\n");
@@ -77,6 +75,10 @@ bool forth_repl_step_once(ConsoleWidget* widget) {
             uforth_abort();
         }
         widget->render();
+        _consoleDirty = false;
+    } else if (_consoleDirty) {
+        widget->render();
+        _consoleDirty = false;
     }
 
     if (exitRequested) {
@@ -112,10 +114,18 @@ void forthREPL() {
     forth_natives_register_definitions();
 
     forth_set_output([](const char *s) {
-        Serial.printf("[OUT] '%s' console=%p\n", s, _activeConsole);
-        if (_activeConsole) _activeConsole->print(s);
+        if (_activeConsole) {
+            _activeConsole->print(s);
+            _consoleDirty = true;
+        }
     });
-    forth_set_cls([]() { if (_activeConsole) { _activeConsole->clear(); _activeConsole->render(); } });
+    forth_set_cls([]() {
+        if (_activeConsole) {
+            _activeConsole->clear();
+            _activeConsole->render();
+            _consoleDirty = false;
+        }
+    });
 
     // 4. Load persistent command history and print welcome greeting
     widget.loadHistory("/forth/history.txt");
@@ -124,6 +134,7 @@ void forthREPL() {
     widget.println("uForth 1.2 Console");
     widget.println("Type 'bye' (save), 'bye!' (no save), 'bye!!' (wipe)");
     widget.render();
+    _consoleDirty = false;
 
     // 5. Main REPL loop
     while (true) {
