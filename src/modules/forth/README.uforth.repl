@@ -26,18 +26,19 @@ When `forthREPL()` is launched:
 
 ---
 
-## 3. Main REPL Loop Execution
+## 3. Main REPL Loop Execution & Step Processor
 
-The interactive loop operates in a `while(true)` loop:
+The interactive loop delegates step execution to `bool forth_repl_step_once(ConsoleWidget* widget)`:
 
-1. **RTOS Yield**: Calls `vTaskDelay(pdMS_TO_TICKS(10))` to yield CPU time to other RTOS tasks.
-2. **Input Polling**: `widget.update(line, exitRequested)` polls keyboard strokes.
-3. **Exit Command Interception**: Intercepts `bye`/`exit`, `bye!`/`exit!`, `bye!!`/`exit!!`, or physical ESC key (`exitRequested`).
-4. **Interpretation**: Copies input line to buffer and calls `uforth_interpret(buf)`.
-5. **Status Handling**:
-   - `UFORTH_OK`: Appends `" ok\n"` to console.
-   - Error (`st != UFORTH_OK`): Prints `uforth_abort_details` or status code, then executes `uforth_abort()`.
-6. **Render**: Calls `widget.render()` to refresh screen TFT buffer.
+1. **RTOS Yield**: Main loop calls `vTaskDelay(pdMS_TO_TICKS(10))` to yield CPU time to other RTOS tasks.
+2. **Step Processing (`forth_repl_step_once`)**:
+   - **Input Polling**: `widget->update(line, exitRequested)` polls keyboard strokes.
+   - **Exit Command Interception**: Intercepts `bye`/`exit`, `bye!`/`exit!`, `bye!!`/`exit!!`, or physical ESC key (`exitRequested`).
+   - **Interpretation**: Copies input line to buffer and calls `uforth_interpret(buf)`.
+   - **Status Handling**:
+     - `UFORTH_OK`: Appends `" ok\n"` to console.
+     - Error (`st != UFORTH_OK`): Prints `uforth_abort_details` or status code, then executes `uforth_abort()`.
+   - **Render**: Calls `widget->render()` to refresh screen TFT buffer.
 
 ---
 

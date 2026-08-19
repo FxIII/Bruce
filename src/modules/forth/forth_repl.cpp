@@ -14,6 +14,10 @@ extern "C" uforth_stat c_handle(void) {
 // Global output redirection callback for uForth C output
 static ConsoleWidget* _activeConsole = nullptr;
 
+ConsoleWidget* getActiveConsoleWidget() {
+    return _activeConsole;
+}
+
 extern "C" void uforth_print_str(const char *s) {
     if (_activeConsole) {
         _activeConsole->print(s);
@@ -23,6 +27,65 @@ extern "C" void uforth_print_str(const char *s) {
 }
 
 extern "C" void uforth_select_task(CELL uram);
+
+bool forth_repl_step_once(ConsoleWidget* widget) {
+    if (!widget) return false;
+    String line;
+    bool exitRequested = false;
+
+    if (widget->update(line, exitRequested)) {
+        // Level 3: Wipe history file and exit
+        if (line == "bye!!" || line == "exit!!") {
+            widget->clearHistoryFile("/forth/history.txt");
+            return true;
+        }
+
+        // Level 2: Exit without saving current session history
+        if (line == "bye!" || line == "exit!") {
+            return true;
+        }
+
+        // Level 1: Save history and exit
+        if (line == "bye" || line == "exit") {
+            widget->saveHistory("/forth/history.txt");
+            return true;
+        }
+
+        // Copy string to buffer and interpret
+        char buf[256];
+        strncpy(buf, line.c_str(), sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+
+        Serial.printf("[REPL] interpret: '%s'\n", buf);
+
+        uforth_stat st = uforth_interpret(buf);
+
+        Serial.printf("[REPL] result: %d\n", (int)st);
+
+        if (st == UFORTH_OK) {
+            widget->print(" ok\n");
+        } else {
+            if (strlen(uforth_abort_details) > 0) {
+                char errbuf[128];
+                snprintf(errbuf, sizeof(errbuf), " ? %s err %d\n", uforth_abort_details, (int)st);
+                widget->print(errbuf);
+            } else {
+                char errbuf[32];
+                snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
+                widget->print(errbuf);
+            }
+            uforth_abort();
+        }
+        widget->render();
+    }
+
+    if (exitRequested) {
+        widget->saveHistory("/forth/history.txt");
+        return true;
+    }
+
+    return false;
+}
 
 void forthREPL() {
     // 1. Initialize ConsoleWidget (fullscreen terminal)
@@ -63,59 +126,10 @@ void forthREPL() {
     widget.render();
 
     // 5. Main REPL loop
-    String line;
-    bool exitRequested = false;
-
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other RTOS tasks
 
-        if (widget.update(line, exitRequested)) {
-            // Level 3: Wipe history file and exit
-            if (line == "bye!!" || line == "exit!!") {
-                widget.clearHistoryFile("/forth/history.txt");
-                break;
-            }
-
-            // Level 2: Exit without saving current session history
-            if (line == "bye!" || line == "exit!") {
-                break;
-            }
-
-            // Level 1: Save history and exit
-            if (line == "bye" || line == "exit") {
-                widget.saveHistory("/forth/history.txt");
-                break;
-            }
-
-            // Copy string to buffer and interpret
-            char buf[256];
-            strncpy(buf, line.c_str(), sizeof(buf) - 1);
-            buf[sizeof(buf) - 1] = '\0';
-
-            Serial.printf("[REPL] interpret: '%s'\n", buf);
-            uforth_stat st = uforth_interpret(buf);
-
-            Serial.printf("[REPL] result: %d\n", (int)st);
-
-            if (st == UFORTH_OK) {
-                widget.print(" ok\n");
-            } else {
-                if (strlen(uforth_abort_details) > 0) {
-                    char errbuf[128];
-                    snprintf(errbuf, sizeof(errbuf), " ? %s err %d\n", uforth_abort_details, (int)st);
-                    widget.print(errbuf);
-                } else {
-                    char errbuf[32];
-                    snprintf(errbuf, sizeof(errbuf), " err %d\n", (int)st);
-                    widget.print(errbuf);
-                }
-                uforth_abort();
-            }
-            widget.render();
-        }
-
-        if (exitRequested) {
-            widget.saveHistory("/forth/history.txt");
+        if (forth_repl_step_once(&widget)) {
             break;
         }
     }
