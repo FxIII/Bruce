@@ -1,4 +1,3 @@
-#include "reactor.h"
 #include "natives_internal.h"
 #include "../uforth.h"
 #include "../forth_repl.h"
