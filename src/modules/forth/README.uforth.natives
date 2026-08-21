@@ -3,7 +3,7 @@
 Architecture and stable core native functions reference for `natives/`.
 
 > [!NOTE]
-> Questa documentazione descrive unicamente l'architettura generale ed il modulo nativo principale (`natives/core.cpp`). Per consultare le altre funzioni native disponibili (es. `display.cpp`, `block.cpp`, ecc.), fare riferimento direttamente ai rispettivi file `.cpp` nella cartella `natives/`. Non occorre aggiornare questo documento quando si aggiungono o estendono nuovi moduli nativi.
+> This documentation describes the overall architecture and main core native module (`natives/core.cpp`). For reference on other available native modules (e.g. `display.cpp`, `block.cpp`, `reactor.cpp`, `lora.cpp`, `gps.cpp`), refer directly to the respective `.cpp` files in `natives/`. It is not required to update this document when adding or extending native modules.
 
 ---
 
@@ -42,14 +42,27 @@ Stable console I/O, commenting, timing, and dictionary inspection native functio
 ### High-Level Core Definitions (`core_definitions`)
 | Forth Word | Forth Definition | Stack Effect | Description |
 | :--- | :--- | :--- | :--- |
-| `count` | `: count dup 1+ swap c@ ;` | `( cstr -- addr len )` | Convert counted string (`cstr`) to standard Forth `( addr len )` pair |
+| `count` | `: count dup 1+ swap 0 +c@ ;` | `( cstr -- addr len )` | Convert counted string (`cstr`) to standard Forth `( addr len )` pair |
 
 ---
 
-## 3. Extending Native Modules
+## 3. Creating & Extending Native Modules
 
-To add a new native module:
-1. Implement native C++ binding handlers in a new `.cpp` file in `natives/` (reading/writing stack via `dpop()` / `dpush()`).
-2. Implement `xxx_bindings(void)` to register primitive C++ handlers via `forth_register("forth-name", fn)`.
-3. *(Optional)* Implement `xxx_definitions(void)` for high-level Forth word definitions (using `uforth_interpret()`).
-4. Declare internal contract functions in `natives/natives_internal.h` and invoke them inside `forth_natives_register_bindings()` / `forth_natives_register_definitions()` in `natives/natives.cpp`.
+To create a new native module in `natives/`:
+
+1. **No Separate `.h` Files**: Do **NOT** create individual per-module `.h` header files (e.g., `lora.h`, `gps.h`, `reactor.h`). Single-purpose header files create redundant `#pragma once` boilerplate and header pollution.
+2. **Centralized Internal Contract (`natives_internal.h`)**: Declare module binding and definition prototypes directly inside `natives/natives_internal.h`:
+   ```cpp
+   void xxx_bindings(void);
+   void xxx_definitions(void); // optional
+   ```
+3. **Single Include**: Each module `.cpp` file in `natives/` includes only:
+   ```cpp
+   #include "natives_internal.h"
+   ```
+4. **Implement Handlers**: Implement native C++ primitive handlers reading/writing stack via `dpop()` / `dpush()`.
+5. **Two-Phase Registration**:
+   - Inside `xxx_bindings()`, register primitive handlers via `forth_register("forth-name", fn)`.
+   - Inside `xxx_definitions()`, define high-level Forth words or register reactor services via `uforth_interpret()`.
+6. **Aggregate Registration**: Call `xxx_bindings()` inside `forth_natives_register_bindings()` and `xxx_definitions()` inside `forth_natives_register_definitions()` in `natives/natives.cpp`.
+7. **String Buffer Standard**: All data buffers written by native modules (e.g. `lora-read`, `gps-pos-str`) must write clean null-terminated C-strings starting directly at `buf[0]` (with `buf[len] = '\0'`). Do not prepend length-prefix bytes.
