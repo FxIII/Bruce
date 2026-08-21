@@ -5,6 +5,8 @@
 
 #if !defined(LITE_VERSION)
 #include <RadioLib.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
 
 extern bool startLoraRadio(float bandMHz);
 extern bool sendLoraMessage(String &payload);
@@ -17,6 +19,21 @@ enum class LoRaRadioVariant { SX1276, SX1262 };
 extern LoRaRadioVariant loraRadioVariant;
 
 static void fn_lora_init() {
+    if (LittleFS.exists("/lora_settings.json")) {
+        File file = LittleFS.open("/lora_settings.json", "r");
+        if (file) {
+            JsonDocument doc;
+            deserializeJson(doc, file);
+            file.close();
+            String stored = doc["LoRa_Radio"] | "SX1276";
+            if (stored.equalsIgnoreCase("SX1262")) {
+                loraRadioVariant = LoRaRadioVariant::SX1262;
+            } else {
+                loraRadioVariant = LoRaRadioVariant::SX1276;
+            }
+        }
+    }
+
     DCELL val = dpop();
     float freq = (float)val;
     if (freq > 10000.0f) {
