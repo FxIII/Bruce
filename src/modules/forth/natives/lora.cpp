@@ -1,4 +1,3 @@
-#include "lora.h"
 #include "natives_internal.h"
 #include "../uforth.h"
 #include <Arduino.h>
@@ -54,8 +53,7 @@ static void fn_lora_read() {
     uint8_t *buf = (uint8_t *)&uforth_ram[addr];
 
     if (!loraPacketReceived || !intlora) {
-        buf[0] = 0;
-        buf[1] = '\0';
+        buf[0] = '\0';
         return;
     }
 
@@ -69,12 +67,10 @@ static void fn_lora_read() {
 
     if (state == RADIOLIB_ERR_NONE) {
         uint8_t len = incoming.length() > 250 ? 250 : (uint8_t)incoming.length();
-        buf[0] = len;
-        memcpy(&buf[1], incoming.c_str(), len);
-        buf[1 + len] = '\0';
+        memcpy(buf, incoming.c_str(), len);
+        buf[len] = '\0';
     } else {
-        buf[0] = 0;
-        buf[1] = '\0';
+        buf[0] = '\0';
     }
 
     if (loraRadioVariant == LoRaRadioVariant::SX1262 && lora1262) {
