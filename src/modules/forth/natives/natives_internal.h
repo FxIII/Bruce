@@ -26,6 +26,9 @@ void forth_reactor_step(void);
 void lora_bindings(void);
 void lora_definitions(void);
 
+void gps_bindings(void);
+void gps_definitions(void);
+
 #ifdef __cplusplus
 }
 #endif
