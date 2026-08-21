@@ -1,4 +1,3 @@
-#include "gps.h"
 #include "natives_internal.h"
 #include "../uforth.h"
 #include "core/configPins.h"
@@ -53,12 +52,10 @@ static void fn_gps_pos_str() {
         char temp[48];
         snprintf(temp, sizeof(temp), "%.6f,%.6f", _tinyGps.location.lat(), _tinyGps.location.lng());
         uint8_t len = (uint8_t)strlen(temp);
-        buf[0] = len;
-        memcpy(&buf[1], temp, len);
-        buf[1 + len] = '\0';
+        memcpy(buf, temp, len);
+        buf[len] = '\0';
     } else {
-        buf[0] = 0;
-        buf[1] = '\0';
+        buf[0] = '\0';
     }
 }
 
