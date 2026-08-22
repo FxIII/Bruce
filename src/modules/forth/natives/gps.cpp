@@ -40,7 +40,13 @@ static void fn_gps_fix() {
 
 static void fn_gps_updated() {
     update_gps_stream();
-    dpush((_gps_initialized && _tinyGps.location.isUpdated()) ? 1 : 0);
+    if (_gps_initialized && _tinyGps.location.isUpdated()) {
+        // Calling lat() clears the internal updated flag in TinyGPS++
+        _tinyGps.location.lat();
+        dpush(1);
+    } else {
+        dpush(0);
+    }
 }
 
 static void fn_gps_pos_str() {
