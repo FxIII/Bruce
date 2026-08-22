@@ -20,12 +20,7 @@ ConsoleWidget* getActiveConsoleWidget() {
 }
 
 extern "C" void uforth_print_str(const char *s) {
-    if (_activeConsole) {
-        _activeConsole->print(s);
-        _consoleDirty = true;
-    } else {
-        Serial.print(s);
-    }
+    forth_output(s);
 }
 
 extern "C" void uforth_select_task(CELL uram);
@@ -117,6 +112,8 @@ void forthREPL() {
         if (_activeConsole) {
             _activeConsole->print(s);
             _consoleDirty = true;
+        } else {
+            Serial.print(s);
         }
     });
     forth_set_cls([]() {
