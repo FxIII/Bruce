@@ -44,12 +44,10 @@ static void fn_dot() {
     char buf[24];
     DCELL n = dpop();
     snprintf(buf, sizeof(buf), "%lld ", (long long)n);
-    Serial.printf("[DEBUG fn_dot] outputting: '%s'\n", buf);
     forth_output(buf);
 }
 
 static void fn_words() {
-    Serial.println("[DEBUG fn_words] called");
     forth_output("\n");
     CELL idx = dict->last_word_idx;
     int count = 0;
@@ -60,14 +58,12 @@ static void fn_words() {
             char name[64];
             memcpy(name, (char *)(uforth_dict + idx + 2), len);
             name[len] = '\0';
-            Serial.printf("[DEBUG fn_words] word: '%s'\n", name);
             forth_output(name);
             forth_output(" ");
             count++;
         }
         idx = uforth_dict[idx];
     }
-    Serial.printf("[DEBUG fn_words] total words: %d\n", count);
     forth_output("\n");
 }
 

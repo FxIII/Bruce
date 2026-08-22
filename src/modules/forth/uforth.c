@@ -148,7 +148,7 @@ void uforth_abort(void) {
             if (pos >= sizeof(msg) - 10) break;
         }
         snprintf(msg + pos, sizeof(msg) - pos, "\n");
-        uforth_print_str(msg);
+        forth_output(msg);
     }
 
     if (uforth_iram->compiling) { dict_append(ABORT); }
