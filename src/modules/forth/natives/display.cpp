@@ -1,14 +1,22 @@
 #include "natives_internal.h"
 #include "../uforth.h"
 #include "core/display.h"
+#include "font8x12.h"
 #include <Arduino.h>
 
-static int _currentFontSize = 1; // 1 = 8px (1.0x), 2 = 12px (1.5x), 3 = 16px (2.0x)
+static int _currentFontSize = 1; // 1 = 6x8px (GLCD), 2 = 8x12px (Monospace 8x12), 3 = 12x16px (GLCD x2)
 
-static float getFontScale(int size) {
-    if (size == 2) return 1.5f;
-    if (size == 3) return 2.0f;
-    return 1.0f;
+static void getCharDimensions(int size, int &char_w, int &char_h) {
+    if (size == 2) {
+        char_w = 8;
+        char_h = 12;
+    } else if (size == 3) {
+        char_w = 12;
+        char_h = 16;
+    } else {
+        char_w = 6;
+        char_h = 8;
+    }
 }
 
 static void fn_cls() {
@@ -27,20 +35,20 @@ static void fn_font_size_get() {
 }
 
 static void fn_rows() {
-    float scale = getFontScale(_currentFontSize);
-    int char_h = (int)(8.0f * scale);
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
     dpush(tftHeight / char_h);
 }
 
 static void fn_cols() {
-    float scale = getFontScale(_currentFontSize);
-    int char_w = (int)(6.0f * scale);
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
     dpush(tftWidth / char_w);
 }
 
 static void fn_row_height() {
-    float scale = getFontScale(_currentFontSize);
-    int char_h = (int)(8.0f * scale);
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
     dpush(char_h);
 }
 
@@ -50,9 +58,8 @@ static void fn_write_line() {
     int line_idx = dpop();
     CELL addr = dpop();
 
-    float scale = getFontScale(_currentFontSize);
-    int char_w = (int)(6.0f * scale);
-    int char_h = (int)(8.0f * scale);
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
     int max_chars = tftWidth / char_w;
 
     // Clear the specific row line (240 x char_h)
@@ -75,9 +82,21 @@ static void fn_write_line() {
         buf[draw_len] = '\0';
 
         tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
-        tft.setTextSize(scale);
-        tft.setCursor(0, y_pixel);
-        tft.print(buf);
+
+        if (_currentFontSize == 2) {
+            // Render using custom 8x12 monospaced bitmap font transparently
+            for (int i = 0; i < draw_len; i++) {
+                char c = buf[i];
+                if (c < 32 || c > 126) c = '?';
+                const uint8_t *glyph = font8x12[c - 32];
+                tft.drawXBitmap(i * 8, y_pixel, glyph, 8, 12, bruceConfig.priColor);
+            }
+        } else {
+            tft.setTextFont(1);
+            tft.setTextSize((_currentFontSize == 3) ? 2 : 1);
+            tft.setCursor(0, y_pixel);
+            tft.print(buf);
+        }
     }
 }
 
@@ -85,10 +104,9 @@ static void fn_draw_cursor() {
     int y = dpop();
     int x = dpop();
 
-    float scale = getFontScale(_currentFontSize);
-    int char_w = (int)(6.0f * scale);
-    int char_h = (int)(8.0f * scale);
-    int cursor_h = (int)(2.0f * scale);
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
+    int cursor_h = (_currentFontSize == 3) ? 4 : 2;
 
     int y_pixel = y * char_h;
     tft.fillRect(x * char_w, y_pixel + char_h - cursor_h, char_w, cursor_h, bruceConfig.priColor);
