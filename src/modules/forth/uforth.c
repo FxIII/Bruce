@@ -46,25 +46,37 @@ struct uforth_iram *uforth_iram;
 struct uforth_uram *uforth_uram;
 
 INLINE void dpush(const DCELL w) {
-    if (uforth_uram->didx == (uforth_uram->dsize+uforth_uram->rsize-1)) {
+    if (uforth_uram->didx >= (uforth_uram->dsize - 1)) {
         uforth_abort_request_details(ABORT_STACKOVER, "data stack", 10);
         return;
     } else uforth_uram->ds[++uforth_uram->didx] = w;
 }
-INLINE DCELL dpop(void) { return uforth_uram->ds[uforth_uram->didx--]; }
+INLINE DCELL dpop(void) {
+    if (uforth_uram->didx < 0) {
+        uforth_abort_request_details(ABORT_STACKOVER, "ds underflow", 12);
+        return 0;
+    }
+    return uforth_uram->ds[uforth_uram->didx--];
+}
 INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
 INLINE void rpush(const DCELL w) {
-    if (uforth_uram->ridx == (uforth_uram->dsize)) {
+    if (uforth_uram->ridx <= uforth_uram->dsize) {
         uforth_abort_request_details(ABORT_STACKOVER, "return stack", 12);
         return;
     }
     else uforth_uram->ds[--uforth_uram->ridx] = w;
 }
-INLINE DCELL rpop(void) { return uforth_uram->ds[uforth_uram->ridx++]; }
+INLINE DCELL rpop(void) {
+    if (uforth_uram->ridx >= (uforth_uram->dsize + uforth_uram->rsize)) {
+        uforth_abort_request_details(ABORT_STACKOVER, "rs underflow", 12);
+        return 0;
+    }
+    return uforth_uram->ds[uforth_uram->ridx++];
+}
 INLINE DCELL rpick(const DCELL n) { return uforth_uram->ds[uforth_uram->ridx+n]; }
 
-INLINE uint32_t dpop32(void) { return dpop(); }
-INLINE void dpush32(const uint32_t w2) { dpush(w2); }
+INLINE int32_t dpop32(void) { return (int32_t)dpop(); }
+INLINE void dpush32(const int32_t w2) { dpush((int64_t)w2); }
 
 #define WORD_LEN_BITS 0x3F
 #define IMMEDIATE_BIT (1<<7)
@@ -101,7 +113,7 @@ DCELL parse_num(char *s, uint8_t base) {
         return (DCELL)FIXED_PT_MULT(f);
     }
 #endif
-    return strtol(s,NULL, uforth_uram->base == 10 ? 0 : uforth_uram->base);
+    return (int32_t)strtol(s,NULL, uforth_uram->base == 10 ? 0 : uforth_uram->base);
 }
 
 CELL find_word(char* s, uint8_t len, DCELL* addr, bool *immediate, bool *prim);
@@ -325,8 +337,8 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             dpush(uforth_dict[wd_idx++]);
             break;
         case DLIT:
-            dpush((((uint32_t)uforth_dict[wd_idx])<<16) |
-                (uint16_t)uforth_dict[wd_idx+1]);
+            dpush((int32_t)((((uint32_t)uforth_dict[wd_idx])<<16) |
+                (uint16_t)uforth_dict[wd_idx+1]));
             wd_idx+=2;
             break;
         case LESS_THAN_ZERO:
@@ -369,8 +381,12 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             dtop() = r1*r2;
             break;
         case DIV:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r2/r1;
+            r1 = dpop();
+            if (r1 == 0) {
+                uforth_abort_request_details(ABORT_ILLEGAL, "div by zero", 11);
+                break;
+            }
+            dtop() = dtop() / r1;
             break;
         case RPICK:
             r1 = dpop();
