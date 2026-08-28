@@ -1,5 +1,6 @@
 #include "natives_internal.h"
 #include "../uforth.h"
+#include "../forth_repl.h"
 #include "core/display.h"
 #include "font8x12.h"
 #include <Arduino.h>
@@ -21,6 +22,13 @@ static void getCharDimensions(int size, int &char_w, int &char_h) {
 
 static void fn_cls() {
     forth_cls();
+}
+
+static void fn_render() {
+    ConsoleWidget* widget = getActiveConsoleWidget();
+    if (widget) {
+        widget->render();
+    }
 }
 
 static void fn_font_size_set() {
@@ -114,6 +122,7 @@ static void fn_draw_cursor() {
 
 void display_bindings() {
     forth_register("br.display.cls", fn_cls);
+    forth_register("br.display.render", fn_render);
     forth_register("br.display.writeLine", fn_write_line);
     forth_register("br.display.drawCursor", fn_draw_cursor);
     forth_register("br.display.fontSize!", fn_font_size_set);
