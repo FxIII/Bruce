@@ -29,6 +29,8 @@ void lora_definitions(void);
 void gps_bindings(void);
 void gps_definitions(void);
 
+void sys_bindings(void);
+
 #ifdef __cplusplus
 }
 #endif
