@@ -52,6 +52,7 @@ void forth_natives_register_bindings() {
     reactor_bindings();
     lora_bindings();
     gps_bindings();
+    sys_bindings();
 }
 
 // Phase 2: Aggregates internal Forth word definition registrations after core load
