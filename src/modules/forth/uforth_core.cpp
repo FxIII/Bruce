@@ -106,6 +106,10 @@ static const char * const _core[] = {
     ": variable _create [compile] lit _allot1 , [compile] ; ;",
     ": constant _create [compile] lit , [compile] ; ;",
     ": dconstant _create [compile] dlit d, [compile] ; ;",
+    ": marker 5 5 dict@ 4 4 dict@ 3 3 dict@ _create",
+    "  [compile] lit , [compile] lit , ['] dict! ,",
+    "  [compile] lit , [compile] lit , ['] dict! ,",
+    "  [compile] lit , [compile] lit , ['] dict! , [compile] ; ;",
 
     // ── do / loop ─────────────────────────────────────────────────────────────
     // do ( limit start -- ) compiles: swap >r >r, leaves loop-start addr on stack.
@@ -227,6 +231,7 @@ static const char * const _tests[] = {
     "defer _dword",
     "['] _dbody is _dword",
     "_dword 99 = 44 _assert",
+    "here marker _tmark 99 constant _tconst _tmark here = 45 _assert",
     nullptr
 };
 

@@ -81,6 +81,7 @@ Flags: `IMM` = Immediate (executed during compilation).
 | `variable` | `: variable _create ... _allot1 ... ;` | `( "name" -- )` | Allocate variable in RAM (1 DCELL) |
 | `constant` | `: constant _create [compile] lit ... ;` | `( val "name" -- )` | Define 16-bit constant |
 | `dconstant`| `: dconstant _create ... d, ... ;` | `( dval "name" -- )` | Define 32-bit constant |
+| `marker`   | `: marker 5 5 dict@ ... ;` | `( "name" -- )` | Create dictionary snapshot word that rolls back dict and RAM on execution |
 | **Bounded Loops (`do ... loop`)** | | | |
 | `do` | `: do [compile] swap >r >r here ;` | `( limit start -- loop_addr )` *(IMM)* | Start loop. Note: Always executed at least once (0-limit entry not checked; wrap in `if ... do ... loop then` if limit can be 0). |
 | `i` | `: i [compile] lit 0 , rpick ;` | `( -- index )` *(IMM)* | Fetch current loop index from RStack |
