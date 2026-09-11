@@ -16,8 +16,10 @@ void core_bindings(void);
 void core_definitions(void);
 
 void display_bindings(void);
+void display_definitions(void);
 
 void block_bindings(void);
+void block_definitions(void);
 
 void reactor_bindings(void);
 void reactor_definitions(void);

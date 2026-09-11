@@ -1,7 +1,7 @@
 #include "natives_internal.h"
 #include <Arduino.h>
 
-#define MAX_NATIVES 64
+#define MAX_NATIVES 128
 
 static forth_output_fn _output_fn = nullptr;
 void forth_set_output(forth_output_fn fn) { _output_fn = fn; }
@@ -58,6 +58,8 @@ void forth_natives_register_bindings() {
 // Phase 2: Aggregates internal Forth word definition registrations after core load
 void forth_natives_register_definitions() {
     core_definitions();
+    display_definitions();
+    block_definitions();
     reactor_definitions();
     lora_definitions();
     gps_definitions();

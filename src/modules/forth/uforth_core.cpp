@@ -144,14 +144,6 @@ static const char * const _core[] = {
     "variable _delim",
     ": word _delim ! 0 pad ! begin next-char dup _delim @ = over 0= or if drop pad exit then pad c!+ again ;",
 
-    // ── Aliases ────────────────────────────────────────────────────────────────
-    ": cls br.display.cls ;",
-    ": write-line br.display.writeLine ;",
-    ": draw-cursor br.display.drawCursor ;",
-    ": block-read br.block.read ;",
-    ": block-write br.block.write ;",
-    ": include br.file.include ;",
-
     nullptr
 };
 
