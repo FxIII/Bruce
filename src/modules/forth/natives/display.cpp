@@ -120,14 +120,92 @@ static void fn_draw_cursor() {
     tft.fillRect(x * char_w, y_pixel + char_h - cursor_h, char_w, cursor_h, bruceConfig.priColor);
 }
 
+static int get_line_rows(CELL addr) {
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
+    int max_chars = tftWidth / char_w;
+    if (max_chars <= 0) max_chars = 1;
+
+    char *line_ptr = (char*)&uforth_ram[addr];
+    int len = strnlen(line_ptr, 64);
+    int rows = (len + max_chars - 1) / max_chars;
+    return (rows < 1) ? 1 : rows;
+}
+
+static void fn_line_rows() {
+    CELL addr = dpop();
+    dpush(get_line_rows(addr));
+}
+
+static void fn_write_line_ml() {
+    int y_pixel = dpop();
+    CELL addr = dpop();
+
+    int char_w, char_h;
+    getCharDimensions(_currentFontSize, char_w, char_h);
+    int max_chars = tftWidth / char_w;
+    if (max_chars <= 0) max_chars = 1;
+
+    int rows = get_line_rows(addr);
+    tft.fillRect(0, y_pixel, tftWidth, rows * char_h, bruceConfig.bgColor);
+
+    char *line_ptr = (char*)&uforth_ram[addr];
+    int len = strnlen(line_ptr, 64);
+
+    tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
+
+    int cur_y = y_pixel;
+    int offset = 0;
+
+    for (int r = 0; r < rows; r++) {
+        int chunk_len = len - offset;
+        if (chunk_len > max_chars) chunk_len = max_chars;
+
+        char buf[128];
+        if (chunk_len > 0) {
+            memcpy(buf, line_ptr + offset, chunk_len);
+            buf[chunk_len] = '\0';
+        } else {
+            buf[0] = '\0';
+        }
+
+        if (_currentFontSize == 2) {
+            for (int i = 0; i < chunk_len; i++) {
+                char c = buf[i];
+                if (c < 32 || c > 126) c = '?';
+                const uint8_t *glyph = font8x12[c - 32];
+                tft.drawXBitmap(i * 8, cur_y, glyph, 8, 12, bruceConfig.priColor);
+            }
+        } else {
+            tft.setTextFont(1);
+            tft.setTextSize((_currentFontSize == 3) ? 2 : 1);
+            tft.setCursor(0, cur_y);
+            tft.print(buf);
+        }
+
+        cur_y += char_h;
+        offset += max_chars;
+    }
+}
+
 void display_bindings() {
     forth_register("br.display.cls", fn_cls);
     forth_register("br.display.render", fn_render);
     forth_register("br.display.writeLine", fn_write_line);
+    forth_register("br.display.writeLineML", fn_write_line_ml);
+    forth_register("br.display.lineRows", fn_line_rows);
     forth_register("br.display.drawCursor", fn_draw_cursor);
     forth_register("br.display.fontSize!", fn_font_size_set);
     forth_register("br.display.fontSize?", fn_font_size_get);
     forth_register("br.display.rows", fn_rows);
     forth_register("br.display.cols", fn_cols);
     forth_register("br.display.rowHeight", fn_row_height);
+}
+
+void display_definitions() {
+    uforth_interpret(": cls br.display.cls ;");
+    uforth_interpret(": write-line br.display.writeLine ;");
+    uforth_interpret(": write-line-ml br.display.writeLineML ;");
+    uforth_interpret(": line-rows br.display.lineRows ;");
+    uforth_interpret(": draw-cursor br.display.drawCursor ;");
 }
