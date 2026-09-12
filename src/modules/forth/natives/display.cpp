@@ -189,23 +189,18 @@ static void fn_write_line_ml() {
 }
 
 void display_bindings() {
-    forth_register("br.display.cls", fn_cls);
-    forth_register("br.display.render", fn_render);
-    forth_register("br.display.writeLine", fn_write_line);
-    forth_register("br.display.writeLineML", fn_write_line_ml);
-    forth_register("br.display.lineRows", fn_line_rows);
-    forth_register("br.display.drawCursor", fn_draw_cursor);
-    forth_register("br.display.fontSize!", fn_font_size_set);
-    forth_register("br.display.fontSize?", fn_font_size_get);
-    forth_register("br.display.rows", fn_rows);
-    forth_register("br.display.cols", fn_cols);
-    forth_register("br.display.rowHeight", fn_row_height);
+    forth_register("cls", fn_cls);                      // cls             ( -- )
+    forth_register("disp-refresh", fn_render);          // disp-refresh    ( -- )
+    forth_register("disp-cursor", fn_draw_cursor);      // disp-cursor     ( col row -- )
+    forth_register("disp-write", fn_write_line);        // disp-write      ( addr row -- )
+    forth_register("disp-write-ml", fn_write_line_ml);  // disp-write-ml   ( addr row rows -- )
+    forth_register("disp-line-rows", fn_line_rows);     // disp-line-rows  ( addr -- rows )
+    forth_register("disp-font!", fn_font_size_set);     // disp-font!      ( size -- )
+    forth_register("disp-font@", fn_font_size_get);     // disp-font@      ( -- size )
+    forth_register("disp-rows", fn_rows);               // disp-rows       ( -- count )
+    forth_register("disp-cols", fn_cols);               // disp-cols       ( -- count )
+    forth_register("disp-row-height", fn_row_height);   // disp-row-height ( -- height )
 }
 
 void display_definitions() {
-    uforth_interpret(": cls br.display.cls ;");
-    uforth_interpret(": write-line br.display.writeLine ;");
-    uforth_interpret(": write-line-ml br.display.writeLineML ;");
-    uforth_interpret(": line-rows br.display.lineRows ;");
-    uforth_interpret(": draw-cursor br.display.drawCursor ;");
 }

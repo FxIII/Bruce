@@ -49,8 +49,8 @@ inline const NativeModule* get_native_modules(size_t &count) {
     static const NativeModule modules[] = {
         { "core",     "dup",               core_bindings,     core_definitions,    true  },
         { "sys",      "sys",               sys_bindings,      nullptr,             false },
-        { "display",  "br.display.cls",    display_bindings,  display_definitions, false },
-        { "block",    "br.block.memSwap",  block_bindings,    block_definitions,   true  },
+        { "display",  "cls",               display_bindings,  nullptr,             false },
+        { "block",    "block-read",        block_bindings,    nullptr,             true  },
         { "reactor",  ".services",         reactor_bindings,  reactor_definitions, false },
         { "lora",     "lora-init",         lora_bindings,     lora_definitions,    false },
         { "gps",      "gps-init",          gps_bindings,      gps_definitions,     false },
