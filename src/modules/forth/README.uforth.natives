@@ -3,7 +3,7 @@
 Architecture and stable core native functions reference for `natives/`.
 
 > [!NOTE]
-> This documentation describes the overall architecture and main core native module (`natives/core.cpp`). For reference on other available native modules (e.g. `display.cpp`, `block.cpp`, `reactor.cpp`, `lora.cpp`, `gps.cpp`), refer directly to the respective `.cpp` files in `natives/`. It is not required to update this document when adding or extending native modules.
+> This documentation describes the overall architecture and main core native module (`natives/core.cpp`). For reference on other available native modules (e.g. `sys.cpp`, `display.cpp`, `block.cpp`, `reactor.cpp`, `lora.cpp`, `gps.cpp`), refer directly to the respective `.cpp` files in `natives/`. It is not required to update this document when adding or extending native modules.
 
 ---
 
@@ -11,14 +11,16 @@ Architecture and stable core native functions reference for `natives/`.
 
 uForth connects Forth code to C/C++ functions via opcode `CALLC` (44):
 
-1. **Registration**: `forth_register("name", fn)` assigns a 1-based ID (up to `MAX_NATIVES` = 64), stores `fn` in `_fns[id]`, and calls `forth_define_native("name", id)` which compiles:
+1. **Registration**: `forth_register("name", fn)` assigns a 1-based ID (up to `MAX_NATIVES` = 128), stores `fn` in `_fns[id]`, and calls `forth_define_native("name", id)` which compiles:
    ```forth
    : name LIT id CALLC EXIT ;
    ```
 2. **Dispatch**: When the VM hits `CALLC`, `c_handle()` pops `id` and executes `forth_dispatch(id)` -> `_fns[id]()`.
-3. **Two-Phase Registration**:
-   - `forth_natives_register_bindings()` inside `natives/natives.cpp` aggregates primitive C++ bindings before `uforth_load_core()`.
-   - `forth_natives_register_definitions()` inside `natives/natives.cpp` aggregates high-level Forth word definitions (via `uforth_interpret()`) after `uforth_load_core()`.
+3. **Two-Phase & Dynamic Module Registration**:
+   - Native modules are declared in `natives_internal.h` via `struct NativeModule` (`name`, `check_word`, `bindings`, `definitions`, `bootstrap`).
+   - **Bootstrap Modules** (`bootstrap = true`, e.g. `core`, `block`): Registered automatically at boot. `forth_natives_register_bindings()` runs primitive C++ bindings before `uforth_load_core()`, and `forth_natives_register_definitions()` loads high-level Forth definitions after `uforth_load_core()`.
+   - **On-Demand Modules** (`bootstrap = false`, e.g. `sys`, `display`, `reactor`, `lora`, `gps`): Loaded dynamically at runtime using the Forth word `use <module>` (e.g. `use sys`, `use display`).
+   - **Module Dependencies**: Certain modules automatically load required dependencies (e.g. `use lora` and `use gps` automatically load `reactor` first).
 
 ---
 
@@ -64,5 +66,5 @@ To create a new native module in `natives/`:
 5. **Two-Phase Registration**:
    - Inside `xxx_bindings()`, register primitive handlers via `forth_register("forth-name", fn)`.
    - Inside `xxx_definitions()`, define high-level Forth words or register reactor services via `uforth_interpret()`.
-6. **Aggregate Registration**: Call `xxx_bindings()` inside `forth_natives_register_bindings()` and `xxx_definitions()` inside `forth_natives_register_definitions()` in `natives/natives.cpp`.
+6. **Module Table Entry**: Register the module in the `get_native_modules()` array inside `natives/natives_internal.h`, specifying its name, check word, binding/definition functions, and `bootstrap` flag.
 7. **String Buffer Standard**: All data buffers written by native modules (e.g. `lora-read`, `gps-pos-str`) must write clean null-terminated C-strings starting directly at `buf[0]` (with `buf[len] = '\0'`). Do not prepend length-prefix bytes.
