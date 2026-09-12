@@ -126,6 +126,7 @@ extern void uforth_print_str(const char*);
 extern void forth_output(const char*);
 extern uforth_stat c_handle(void);
 char* uforth_next_word(void);
+CELL find_word(char* s, uint8_t slen, DCELL* addr, bool *immediate, bool *primitive);
 
 #define IRAM_BYTES (DCELL)(sizeof(struct uforth_iram))/sizeof(DCELL)
 #define URAM_HDR_BYTES (DCELL)(sizeof(struct uforth_uram))/sizeof(DCELL)
