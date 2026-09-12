@@ -250,27 +250,14 @@ static void fn_block_interpret() {
 }
 
 void block_bindings() {
-    forth_register("load", fn_block_interpret);
-    forth_register("br.block.read", fn_block_read);
-    forth_register("br.block.write", fn_block_write);
-    forth_register("br.block.readPage", fn_block_read_page);
-    forth_register("br.block.writePage", fn_block_write_page);
-    forth_register("br.block.memSwap", fn_mem_swap);
-    forth_register("mem-swap", fn_mem_swap);
-    forth_register("br.block.reorder", fn_block_reorder);
-    forth_register("reorder", fn_block_reorder);
+    forth_register("load", fn_block_interpret);          // load          ( num -- )
+    forth_register("block-read", fn_block_read);         // block-read    ( addr num -- )
+    forth_register("block-write", fn_block_write);       // block-write   ( addr num -- )
+    forth_register("block-readp", fn_block_read_page);   // block-readp   ( addr num page -- )
+    forth_register("block-writep", fn_block_write_page); // block-writep  ( addr num page -- )
+    forth_register("mem-swap", fn_mem_swap);             // mem-swap      ( src-addr dst-addr tmp-addr size -- )
+    forth_register("reorder", fn_block_reorder);         // reorder       ( order-addr buf-addr -- )
 }
 
 void block_definitions() {
-    uforth_interpret(": block-read 0 br.block.readPage ;");
-    uforth_interpret(": block-write 0 br.block.writePage ;");
-    uforth_interpret(": block-read-page br.block.readPage ;");
-    uforth_interpret(": block-write-page br.block.writePage ;");
-    uforth_interpret(": init-line-order ( order-addr buf-addr -- )\n"
-                     "  16 0 do 255 2 pick i +c! loop\n"
-                     "  0 16 0 do 1 pick i 64 * +c@ if drop i 1+ then loop\n"
-                     "  dup 0= if drop drop drop exit then\n"
-                     "  0 3 pick 0 +c!\n"
-                     "  dup 1 do 2 pick i 1- +c@ 2 pick i 1- 8 * + line-rows + 3 pick i +c! loop\n"
-                     "  drop drop drop ;");
 }
