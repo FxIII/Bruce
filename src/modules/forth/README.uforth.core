@@ -29,11 +29,11 @@ Flags: `IMM` = Immediate (executed during compilation).
 | `dup?` | `: dup? dup 0= 0= if dup then ;` | `( x -- x x \| 0 )` | Duplicate TOS only if non-zero |
 | **Comparison** | | | |
 | `=` | `: = - 0= ;` | `( n1 n2 -- flag )` | True if `n1 == n2` |
-| `<>` | `: <> - 0= invert ;` | `( n1 n2 -- flag )` | True if `n1 != n2` |
+| `<>` | `: <> - 0= not ;` | `( n1 n2 -- flag )` | True if `n1 != n2` |
 | `<` | `: < - <0 ;` | `( n1 n2 -- flag )` | True if `n1 < n2` |
 | `>` | `: > swap < ;` | `( n1 n2 -- flag )` | True if `n1 > n2` |
 | `0>` | `: 0> 0 > ;` | `( n -- flag )` | True if `n > 0` |
-| `>=` | `: >= - <0 invert ;` | `( n1 n2 -- flag )` | True if `n1 >= n2` |
+| `>=` | `: >= - <0 not ;` | `( n1 n2 -- flag )` | True if `n1 >= n2` |
 | `<=` | `: <= swap >= ;` | `( n1 n2 -- flag )` | True if `n1 <= n2` |
 | `min` | `: min 2dup > if swap then drop ;` | `( n1 n2 -- min )` | Minimum of two values |
 | `max` | `: max 2dup < if swap then drop ;` | `( n1 n2 -- max )` | Maximum of two values |
