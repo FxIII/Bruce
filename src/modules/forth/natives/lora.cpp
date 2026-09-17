@@ -81,6 +81,7 @@ static void fn_lora_read() {
     loraInterruptEnabled = true;
 }
 
+// Note: lora-write expects a length-prefixed buffer (buf[0] = length, payload at buf[1..len])
 static void fn_lora_write() {
     DCELL addr = dpop();
     uint8_t *buf = (uint8_t *)&uforth_ram[addr];

@@ -58,7 +58,13 @@ INLINE DCELL dpop(void) {
     }
     return uforth_uram->ds[uforth_uram->didx--];
 }
-INLINE DCELL dpick(const DCELL n) { return uforth_uram->ds[uforth_uram->didx-n]; }
+INLINE DCELL dpick(const DCELL n) {
+    if (n < 0 || n > uforth_uram->didx) {
+        uforth_abort_request_details(ABORT_STACKOVER, "pick oob", 8);
+        return 0;
+    }
+    return uforth_uram->ds[uforth_uram->didx-n];
+}
 INLINE void rpush(const DCELL w) {
     if (uforth_uram->ridx <= uforth_uram->dsize) {
         uforth_abort_request_details(ABORT_STACKOVER, "return stack", 12);
@@ -73,7 +79,13 @@ INLINE DCELL rpop(void) {
     }
     return uforth_uram->ds[uforth_uram->ridx++];
 }
-INLINE DCELL rpick(const DCELL n) { return uforth_uram->ds[uforth_uram->ridx+n]; }
+INLINE DCELL rpick(const DCELL n) {
+    if (n < 0 || (uforth_uram->ridx + n) >= (uforth_uram->dsize + uforth_uram->rsize)) {
+        uforth_abort_request_details(ABORT_STACKOVER, "rpick oob", 9);
+        return 0;
+    }
+    return uforth_uram->ds[uforth_uram->ridx+n];
+}
 
 INLINE int32_t dpop32(void) { return (int32_t)dpop(); }
 INLINE void dpush32(const int32_t w2) { dpush((int64_t)w2); }
@@ -93,7 +105,7 @@ enum {
     INVERT, COMMA, DCOMMA, RPUSH, RPOP, FETCH, STORE, DICT_FETCH, DICT_STORE,
     COMMA_STRING,
     VAR_ALLOT, CALLC, FIND, FIND_ADDR, CHAR_APPEND, CHAR_FETCH, CHAR_STORE, DCHAR_FETCH,
-    POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, LAST_PRIMITIVE
+    POSTPONE, _CREATE, PARSE_NUM, PARSE_FNUM, DUP, SWAP, LAST_PRIMITIVE
 };
 
 INLINE uint32_t abs32(int32_t v) {
@@ -272,6 +284,8 @@ void uforth_load_prims(void) {
     store_prim("+dict-c@", DCHAR_FETCH);
     store_prim("here", HERE);
     store_prim("<0", LESS_THAN_ZERO);
+    store_prim("dup", DUP);
+    store_prim("swap", SWAP);
 }
 
 char* uforth_count_str(CELL addr, CELL* new_addr) {
@@ -280,6 +294,13 @@ char* uforth_count_str(CELL addr, CELL* new_addr) {
     *new_addr = uforth_ram[addr];
     return str;
 }
+
+#define REQUIRE_DSTACK(n) do { \
+    if (uforth_uram->didx < ((n) - 1)) { \
+        uforth_abort_request_details(ABORT_STACKOVER, "ds underflow", 12); \
+        goto CHECK_STAT; \
+    } \
+} while(0)
 
 uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
     while(1) {
@@ -318,7 +339,8 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             if (r2 == 0) wd_idx += r1;
             break;
         case DROP:
-            dpop();
+            REQUIRE_DSTACK(1);
+            uforth_uram->didx--;
             break;
         case JMP:
             wd_idx = dpop();
@@ -342,51 +364,61 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             wd_idx+=2;
             break;
         case LESS_THAN_ZERO:
-            r1 = dpop();
-            dpush(r1 < 0);
+            REQUIRE_DSTACK(1);
+            uforth_uram->ds[uforth_uram->didx] = (uforth_uram->ds[uforth_uram->didx] < 0);
             break;
         case ADD:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r1+r2;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] += uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case SUB:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r2-r1;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] -= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case AND:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r1&r2;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] &= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case LSHIFT:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r2<<r1;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] <<= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case RSHIFT:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r2>>r1;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] >>= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case OR:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r1|r2;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] |= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case XOR:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r1^r2;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] ^= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case INVERT:
-            dtop() = ~dtop();
+            REQUIRE_DSTACK(1);
+            uforth_uram->ds[uforth_uram->didx] = ~uforth_uram->ds[uforth_uram->didx];
             break;
         case MULT:
-            r1 = dpop(); r2 = dtop();
-            dtop() = r1*r2;
+            REQUIRE_DSTACK(2);
+            uforth_uram->ds[uforth_uram->didx-1] *= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case DIV:
-            r1 = dpop();
-            if (r1 == 0) {
+            REQUIRE_DSTACK(2);
+            if (uforth_uram->ds[uforth_uram->didx] == 0) {
                 uforth_abort_request_details(ABORT_ILLEGAL, "div by zero", 11);
                 break;
             }
-            dtop() = dtop() / r1;
+            uforth_uram->ds[uforth_uram->didx-1] /= uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->didx--;
             break;
         case RPICK:
             r1 = dpop();
@@ -398,8 +430,19 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             r2 = dpick(r1);
             dpush(r2);
             break;
+        case DUP:
+            REQUIRE_DSTACK(1);
+            dpush(uforth_uram->ds[uforth_uram->didx]);
+            break;
+        case SWAP:
+            REQUIRE_DSTACK(2);
+            r1 = uforth_uram->ds[uforth_uram->didx];
+            uforth_uram->ds[uforth_uram->didx] = uforth_uram->ds[uforth_uram->didx-1];
+            uforth_uram->ds[uforth_uram->didx-1] = r1;
+            break;
         case EQ_ZERO:
-            dtop() = (dtop() == 0);
+            REQUIRE_DSTACK(1);
+            uforth_uram->ds[uforth_uram->didx] = (uforth_uram->ds[uforth_uram->didx] == 0);
             break;
         case RPUSH:
             rpush(dpop());

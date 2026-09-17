@@ -1,6 +1,6 @@
 # uForth Primitives Reference
 
-Dense reference for uForth 54 native primitives defined in `uforth.c` (`uforth_load_prims`).
+Dense reference for uForth 56 native primitives defined in `uforth.c` (`uforth_load_prims`).
 Types: `CELL` = 16-bit int (dict), `DCELL` = 64-bit int (RAM/Stack). Flags: `IMM` = Immediate, `PRIM` = Primitive.
 
 > [!CRITICAL ARCHITECTURE CONSTRAINT]
@@ -62,12 +62,14 @@ Types: `CELL` = 16-bit int (dict), `DCELL` = 64-bit int (RAM/Stack). Flags: `IMM
 | `_create` | 52 | `_CREATE` | `( -- )` | Build word header in dict without enabling compiling mode |
 | `>num` | 53 | `PARSE_NUM` | `( cstr_addr -- num )` | Parse RAM counted-str to int/fixed in active base |
 | `>fnum` | 54 | `PARSE_FNUM` | `( cstr_addr -- fnum )`| Append `.` to RAM counted-str & parse fixed-point float |
+| `dup` | 55 | `DUP` | `( x -- x x )` | Duplicate top of Data Stack (TOS) |
+| `swap` | 56 | `SWAP` | `( x1 x2 -- x2 x1 )` | Swap top two stack items |
 
 ---
 
 ## Category Groupings
 
-- **Stack**: `drop` (26), `pick` (7), `>r` (36), `r>` (37), `rpick` (8)
+- **Stack**: `drop` (26), `dup` (55), `swap` (56), `pick` (7), `>r` (36), `r>` (37), `rpick` (8)
 - **Math/Bitwise**: `+` (12), `-` (13), `*` (14), `/` (15), `and` (16), `or` (21), `xor` (22), `invert` (33), `lshift` (23), `rshift` (24)
 - **Logic**: `0=` (25), `<0` (30)
 - **Memory**: `@` (38), `!` (39), `dict@` (40), `dict!` (41), `+c@` (48), `+c!` (49), `+dict-c@` (50), `c!+` (47), `ram` (11), `uram` (6)
