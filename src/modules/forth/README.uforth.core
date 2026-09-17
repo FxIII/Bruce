@@ -98,6 +98,8 @@ Flags: `IMM` = Immediate (executed during compilation).
 | `word` | `: word _delim ! 0 pad ! ... ;` | `( char -- pad_addr )` | Read TIB until delimiter into `pad` |
 | `type` | `: type 0 begin 2dup +c@ ... emit 1+ ;` | `( addr -- )` | Print null-terminated string |
 | `s!` | `: s! over dict@ >r ... 2drop r> ;` | `( dict_addr ram_addr -- len )` | Unpack dict string to RAM with `\0`, returns length |
+| `vhere` | `: vhere 5 dict@ 175 + ;` | `( -- addr )` | Next free RAM variable cell address |
+| `string` | `: string _create [compile] lit ... ; ;` | `( "name" "<text>" -- )` | Define named literal string in RAM, null-terminated |
 
 ---
 
@@ -106,8 +108,8 @@ Flags: `IMM` = Immediate (executed during compilation).
 - **Stack**: `dup`, `over`, `swap`, `rot`, `nip`, `tuck`, `2dup`, `2drop`, `r@`, `rdrop`
 - **Math/Logic**: `nop`, `1+`, `1-`, `2+`, `2*`, `negate`, `not`, `0<`, `abs`, `dup?`
 - **Comparison**: `=`, `<>`, `<`, `>`, `0>`, `>=`, `<=`, `min`, `max`
-- **Memory/Introspection**: `+!`, `incr`, `decr`, `mod`, `depth`, `CELL`, `CELL+`, `dversion`, `wordsize`, `maxdict`, `_here`, `lwa`, `iram`, `compiling?`, `ramsize`, `compiling-word-addr`, `uram-size`, `base`, `sidx`, `ridx`, `dslen`, `rslen`, `dsa`, `rsa`, `tos`
+- **Memory/Introspection**: `+!`, `incr`, `decr`, `mod`, `depth`, `CELL`, `CELL+`, `dversion`, `wordsize`, `maxdict`, `_here`, `lwa`, `iram`, `compiling?`, `ramsize`, `compiling-word-addr`, `uram-size`, `base`, `sidx`, `ridx`, `dslen`, `rslen`, `dsa`, `rsa`, `tos`, `vhere`
 - **Control Flow**: `begin`, `until`, `again`, `if`, `then`, `else`, `while`, `repeat`, `exit`
-- **Definition Builders**: `'`, `[']`, `[compile]`, `create`, `variable`, `constant`, `dconstant`
+- **Definition Builders**: `'`, `[']`, `[compile]`, `create`, `variable`, `constant`, `dconstant`, `string`
 - **Do Loops**: `do`, `i`, `j`, `leave`, `+loop`, `loop`, `unloop`
-- **Indirection/Strings**: `defer`, `is`, `allot`, `pad`, `word`, `type`, `s!`
+- **Indirection/Strings**: `defer`, `is`, `allot`, `pad`, `word`, `type`, `s!`, `string`
