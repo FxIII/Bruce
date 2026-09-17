@@ -13,11 +13,11 @@
 */
 #define TOTAL_RAM_CELLS     1024    /* 1024 * 8 bytes = 8KB */
 
-/* NOTE: PAD_SIZE/TIB_SIZE are counts of DCELL *cells* here (not bytes),
- * since PAD_ADDR/PAD_STR and the tib buffer are laid out in uforth_ram
- * (DCELL[]) units. Keep this in mind if you ever change PAD_SIZE. */
-#define PAD_SIZE            64
-#define TIB_SIZE            128     /* chars for the text-input-buffer (tib[TIB_SIZE] is char[], byte-sized) */
+/* NOTE: PAD_SIZE is a count of DCELL cells (64 * 8 = 512 bytes) at the end of
+ * uforth_ram. TIB_SIZE is a count of bytes/chars for the input buffer tib[TIB_SIZE]
+ * in struct uforth_iram. Keep this distinction in mind if altering these values. */
+#define PAD_SIZE            64      /* DCELL cells (512 bytes) */
+#define TIB_SIZE            128     /* chars/bytes for the text-input-buffer */
 
 #define TASK0_DS_CELLS      64
 #define TASK0_RS_CELLS      32

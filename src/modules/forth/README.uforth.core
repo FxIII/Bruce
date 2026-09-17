@@ -96,8 +96,8 @@ Flags: `IMM` = Immediate (executed during compilation).
 | `allot` | `: allot 0 do _allot1 drop loop ;` | `( n -- )` | Allocate n DCELLs in RAM |
 | `pad` | `variable pad 160 4 / allot` | `( -- addr )` | RAM scratchpad buffer (160 bytes) |
 | `word` | `: word _delim ! 0 pad ! ... ;` | `( char -- pad_addr )` | Read TIB until delimiter into `pad` |
-| `.s` | `: .s depth dup if ... loop then drop ;`| `( -- )` | Print all elements on Data Stack |
 | `type` | `: type 0 begin 2dup +c@ ... emit 1+ ;` | `( addr -- )` | Print null-terminated string |
+| `s!` | `: s! over dict@ >r ... 2drop r> ;` | `( dict_addr ram_addr -- len )` | Unpack dict string to RAM with `\0`, returns length |
 
 ---
 
@@ -110,4 +110,4 @@ Flags: `IMM` = Immediate (executed during compilation).
 - **Control Flow**: `begin`, `until`, `again`, `if`, `then`, `else`, `while`, `repeat`, `exit`
 - **Definition Builders**: `'`, `[']`, `[compile]`, `create`, `variable`, `constant`, `dconstant`
 - **Do Loops**: `do`, `i`, `j`, `leave`, `+loop`, `loop`, `unloop`
-- **Indirection/Strings**: `defer`, `is`, `allot`, `pad`, `word`, `.s`, `type`
+- **Indirection/Strings**: `defer`, `is`, `allot`, `pad`, `word`, `type`, `s!`

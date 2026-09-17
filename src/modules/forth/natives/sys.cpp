@@ -29,7 +29,22 @@ static void fn_sys_ds() {
 
     for (int i = 0; i <= uforth_uram->didx; i++) {
         DCELL val = uforth_uram->ds[i];
-        snprintf(buf, sizeof(buf), " [%d] %lld (0x%llX)\n", i, (long long)val, (unsigned long long)val);
+        char tag[3] = {' ', ' ', '\0'};
+        switch (val) {
+            case 0:  tag[0] = '\\'; tag[1] = '0'; break;
+            case 8:  tag[0] = '\\'; tag[1] = 'b'; break;
+            case 9:  tag[0] = '\\'; tag[1] = 't'; break;
+            case 10: tag[0] = '\\'; tag[1] = 'n'; break;
+            case 13: tag[0] = '\\'; tag[1] = 'r'; break;
+            case 27: tag[0] = '\\'; tag[1] = 'e'; break;
+            case 32: tag[0] = '\\'; tag[1] = 's'; break;
+            default:
+                if (val >= 33 && val <= 126) {
+                    tag[1] = (char)val;
+                }
+                break;
+        }
+        snprintf(buf, sizeof(buf), " [%d] %s %lld (0x%llX)\n", i, tag, (long long)val, (unsigned long long)val);
         forth_output(buf);
     }
     render_console_if_active();
@@ -211,6 +226,7 @@ static void fn_sys() {
 
 void sys_bindings(void) {
     forth_register("sys.ds", fn_sys_ds);
+    forth_register(".s", fn_sys_ds);
     forth_register("sys.rs", fn_sys_rs);
     forth_register("sys.dict", fn_sys_dict);
     forth_register("sys.ram", fn_sys_ram);

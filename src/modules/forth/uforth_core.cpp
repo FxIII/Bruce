@@ -11,9 +11,7 @@
 static const char * const _core[] = {
 
     // ── Stack ─────────────────────────────────────────────────────────────────
-    ": dup 0 pick ;",
     ": over 1 pick ;",
-    ": swap >r >r 1 rpick r> r> drop ;",
     ": rot >r swap r> swap ;",
     ": nip swap drop ;",
     ": tuck swap over ;",
@@ -89,7 +87,6 @@ static const char * const _core[] = {
     // ── Derived ────────────────────────────────────────────────────────────────
     ": abs dup <0 if negate then ;",
     ": dup? dup 0= 0= if dup then ;",
-    ": .s depth dup if dup 0 do dup i - pick . loop then drop ;",
     ": type 0 begin 2dup +c@ dup 0= if drop drop drop exit then emit 1+ again ;",
 
     // ── Tick / compile-time helpers ────────────────────────────────────────────
@@ -143,6 +140,7 @@ static const char * const _core[] = {
     "variable pad 160 4 / allot",
     "variable _delim",
     ": word _delim ! 0 pad ! begin next-char dup _delim @ = over 0= or if drop pad exit then pad c!+ again ;",
+    ": s! over dict@ >r r@ if r@ 0 do over 1+ i +dict-c@ over i +c! loop then 0 over r@ +c! 2drop r> ;",
 
     nullptr
 };
