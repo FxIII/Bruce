@@ -141,6 +141,11 @@ static const char * const _core[] = {
     "variable _delim",
     ": word _delim ! 0 pad ! begin next-char dup _delim @ = over 0= or if drop pad exit then pad c!+ again ;",
     ": s! over dict@ >r r@ if r@ 0 do over 1+ i +dict-c@ over i +c! loop then 0 over r@ +c! 2drop r> ;",
+    ": vhere 5 dict@ 175 + ;",
+    ": string _create [compile] lit vhere begin next-char dup 34 = swap 0= or until",
+    "  34 word drop pad @ 8 + 8 / allot pad 1+ swap",
+    "  pad @ if pad @ 0 do over i +c@ over i +c! loop then",
+    "  0 over pad @ +c! nip , [compile] ; ;",
 
     nullptr
 };
