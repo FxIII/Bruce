@@ -38,8 +38,6 @@ static const char * const _core[] = {
     ": 0> 0 > ;",
     ": >= - <0 not ;",
     ": <= swap >= ;",
-    ": min 2dup > if swap then drop ;",
-    ": max 2dup < if swap then drop ;",
 
     // ── Memory utilities ───────────────────────────────────────────────────────
     ": +! dup >r @ + r> ! ;",
@@ -86,6 +84,8 @@ static const char * const _core[] = {
 
     // ── Derived ────────────────────────────────────────────────────────────────
     ": abs dup <0 if negate then ;",
+    ": min 2dup > if swap then drop ;",
+    ": max 2dup < if swap then drop ;",
     ": dup? dup 0= 0= if dup then ;",
     ": type 0 begin 2dup +c@ dup 0= if drop drop drop exit then emit 1+ again ;",
 
@@ -229,6 +229,8 @@ static const char * const _tests[] = {
     "['] _dbody is _dword",
     "_dword 99 = 44 _assert",
     "here marker _tmark 99 constant _tconst _tmark here = 45 _assert",
+    "3 5 min 3 = 5 3 min 3 = and 46 _assert",
+    "3 5 max 5 = 5 3 max 5 = and 47 _assert",
     nullptr
 };
 
