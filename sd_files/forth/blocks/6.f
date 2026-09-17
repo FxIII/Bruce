@@ -80,11 +80,11 @@ string sbar "B:00 P:00 L:00  [H]elp"
 
 \ PAGE 5 - Help Screen - 81
 string ht0 "=== FORTH BLOCK EDIT ==="
-string ht1 "UP/DOWN or ;/.  Move line"
-string ht2 "LEFT/RG or ,//  Prev/Next"
+string ht1 "UP/DN (; .) or U/D Shift"
+string ht2 "LF/RG (, /)     Page -/+"
 string ht3 "ENTER           Edit line"
-string ht4 "S               Save SD"
-string ht5 "H               Help"
+string ht4 "N / K           New/Kill"
+string ht5 "S / H           Save/Help"
 string ht6 "ESC or ~        Exit"
 string htp "--- press any key ---"
 : vc-help
@@ -94,35 +94,35 @@ string htp "--- press any key ---"
   ht3 48 showline  ht4 64 showline
   ht5 80 showline  ht6 96 showline
   htp 112 showline key drop ;
-\ PAGE 6 - Viewer - 97
-variable cbs 7 allot
+\ PAGE 6 - Line Operations - 97
+: lclear laddr 8 0 do 0 over i + ! loop drop ;
+: lswap swap laddr swap laddr pad 64 mem-swap ;
+: vc-lup vline @ 0 > if
+    vline @ dup 1- lswap -1 vline +! then ;
+: vc-ldown vline @ 15 < if
+    vline @ dup 1+ lswap 1 vline +! then ;
+: vc-lnew vline @ insert ;
+: vc-lkill vline @ 15 = if
+    15 lclear else vline @ outsert then ;
+
+
+
+
+
+
+\ PAGE 7 - Viewer Loop - 113
+variable cbs 11 allot : vc-ret@ cbs + 5 +c@ ;
 : vc-cb! swap >r r@ cbs + ! r@ cbs + 5 +c!
   r@ cbs + 6 +c! r@ cbs + 7 +c! r> drop ;
-: vc-ret@ cbs + 5 +c@ ;
 : vc-c1@ cbs + 7 +c@ ;  : vc-c2@ cbs + 6 +c@ ;
 : vc-cb dup cbs + @ 0xFFFFFFFF and exec vc-ret@ ;
-
 177 96 1 0 ' nop     vc-cb!   218 59 0 1 ' vc-up   vc-cb!
 217 46 0 2 ' vc-down vc-cb!   215 47 0 3 ' vc-next vc-cb!
 216 44 0 4 ' vc-prev vc-cb!    13 13 0 5 ' vc-edit vc-cb!
 115 83 0 6 ' vc-save vc-cb!   104 72 0 7 ' vc-help vc-cb!
-: vkey 8 0 do dup i vc-c1@ = over i vc-c2@ = or
+117 85 0 8 ' vc-lup  vc-cb!   100 68 0 9 ' vc-ldown vc-cb!
+110 78 0 10 ' vc-lnew vc-cb!  107 75 0 11 ' vc-lkill vc-cb!
+: vkey 12 0 do dup i vc-c1@ = over i vc-c2@ = or
    if i vc-cb unloop exit then loop false ;
 : view vblk ! 0 page ! vc-reset vc-read begin
    vdraw vcursor key vkey swap drop until ;
-\ PAGE 7 - Reserved for Line Ops - 113
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
