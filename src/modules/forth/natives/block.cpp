@@ -249,6 +249,60 @@ static void fn_block_interpret() {
     file.close();
 }
 
+static bool interpret_ram_line(const char *line_ptr, int max_len, int line_num) {
+    int len = 0;
+    while (len < max_len && line_ptr[len] != '\0') {
+        len++;
+    }
+    while (len > 0 && (line_ptr[len - 1] == ' ' || line_ptr[len - 1] == '\r' || line_ptr[len - 1] == '\n')) {
+        len--;
+    }
+    int start = 0;
+    while (start < len && line_ptr[start] == ' ') {
+        start++;
+    }
+    if (start >= len) return true;
+    if (line_ptr[start] == '\\') return true;
+
+    char buf[128];
+    int line_len = len - start;
+    if (line_len >= (int)sizeof(buf)) line_len = sizeof(buf) - 1;
+    memcpy(buf, line_ptr + start, line_len);
+    buf[line_len] = '\0';
+
+    uforth_stat st = uforth_interpret(buf);
+    if (st != UFORTH_OK) {
+        char errMsg[192];
+        if (line_num > 0) {
+            snprintf(errMsg, sizeof(errMsg), "Error %d on line %d: %s\n", (int)st, line_num, buf);
+        } else {
+            snprintf(errMsg, sizeof(errMsg), "Error %d: %s\n", (int)st, buf);
+        }
+        forth_output(errMsg);
+        uforth_abort_request(ABORT_NAW);
+        uforth_abort();
+        return false;
+    }
+    return true;
+}
+
+static void fn_eval_line() {
+    CELL addr = dpop();
+    char *line_ptr = (char*)&uforth_ram[addr];
+    interpret_ram_line(line_ptr, 64, 0);
+}
+
+static void fn_eval_page() {
+    CELL addr = dpop();
+    char *base_ptr = (char*)&uforth_ram[addr];
+    for (int i = 0; i < 16; i++) {
+        char *line_ptr = base_ptr + i * 64;
+        if (!interpret_ram_line(line_ptr, 64, i + 1)) {
+            break;
+        }
+    }
+}
+
 void block_bindings() {
     forth_register("load", fn_block_interpret);          // load          ( num -- )
     forth_register("block-read", fn_block_read);         // block-read    ( addr num -- )
@@ -257,6 +311,8 @@ void block_bindings() {
     forth_register("block-writep", fn_block_write_page); // block-writep  ( addr num page -- )
     forth_register("mem-swap", fn_mem_swap);             // mem-swap      ( src-addr dst-addr tmp-addr size -- )
     forth_register("reorder", fn_block_reorder);         // reorder       ( order-addr buf-addr -- )
+    forth_register("eval-line", fn_eval_line);           // eval-line     ( addr -- )
+    forth_register("eval-page", fn_eval_page);           // eval-page     ( buf-addr -- )
 }
 
 void block_definitions() {
