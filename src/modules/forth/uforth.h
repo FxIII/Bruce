@@ -119,7 +119,11 @@ INLINE DCELL rpick(const DCELL n);
 
 extern void uforth_init(void);
 extern void uforth_load_prims(void);
-extern void uforth_abort(void);
+#ifdef __cplusplus
+extern void uforth_abort(CELL pc = 0);
+#else
+extern void uforth_abort(CELL pc);
+#endif
 extern uforth_stat uforth_interpret(const char*);
 extern uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix);
 extern void uforth_print_str(const char*);
