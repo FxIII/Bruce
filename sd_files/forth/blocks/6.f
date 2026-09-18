@@ -32,7 +32,7 @@ variable buf 127 allot variable cur
 
 \ PAGE 2 - Line Management - 33
 2 disp-font!
-variable ord 1 allot
+variable ord 1 allot variable vact
 : >ord 16 0 do i 1+ 10 * ord i +c! loop ;
 : _sert >ord ord swap +c! ord buf reorder ;
 : insert 10 * 5 + 15 _sert ;
@@ -71,21 +71,21 @@ string sbar "B:00 P:00 L:00  [H]elp"
 : vc-next 1 page +! vc-reset vc-read ;
 : vc-prev page @ 0 > if -1 page +! vc-reset vc-read then ;
 : vc-save vblk @ page @ writep ;
-
-
-
-
-
-
-
+: lclear laddr 8 0 do 0 over i + ! loop drop ;
+: lswap swap laddr swap laddr pad 64 mem-swap ;
+: vc-lup vline @ if vline @ dup 1- lswap -1 vline +! then ;
+: vc-ldown vline @ 15 < if vline @ dup 1+ lswap 1 vline +! then ;
+: vc-lnew vline @ insert ;
+: vc-lkill vline @ 15 = if 15 lclear else vline @ outsert then ;
+: vc-xline 1 vact ! ; : vc-xpage 2 vact ! ; : vc-xblk 3 vact ! ;
 \ PAGE 5 - Help Screen - 81
 string ht0 "=== FORTH BLOCK EDIT ==="
 string ht1 "UP/DN (; .) or U/D Shift"
 string ht2 "LF/RG (, /)     Page -/+"
 string ht3 "ENTER           Edit line"
 string ht4 "N / K           New/Kill"
-string ht5 "S / H           Save/Help"
-string ht6 "ESC or ~        Exit"
+string ht5 "L/P/B           Run L/P/B"
+string ht6 "S / H / ESC     Save/Help/Exit"
 string htp "--- press any key ---"
 : vc-help
   cls
@@ -94,35 +94,34 @@ string htp "--- press any key ---"
   ht3 48 showline  ht4 64 showline
   ht5 80 showline  ht6 96 showline
   htp 112 showline key drop ;
-\ PAGE 6 - Line Operations - 97
-: lclear laddr 8 0 do 0 over i + ! loop drop ;
-: lswap swap laddr swap laddr pad 64 mem-swap ;
-: vc-lup vline @ 0 > if
-    vline @ dup 1- lswap -1 vline +! then ;
-: vc-ldown vline @ 15 < if
-    vline @ dup 1+ lswap 1 vline +! then ;
-: vc-lnew vline @ insert ;
-: vc-lkill vline @ 15 = if
-    15 lclear else vline @ outsert then ;
-
-
-
-
-
-
-\ PAGE 7 - Viewer Loop - 113
-variable cbs 11 allot : vc-ret@ cbs + 5 +c@ ;
+\ PAGE 6 - Key Dispatch - 97
+variable cbs 14 allot : vc-ret@ cbs + 5 +c@ ;
 : vc-cb! swap >r r@ cbs + ! r@ cbs + 5 +c!
   r@ cbs + 6 +c! r@ cbs + 7 +c! r> drop ;
 : vc-c1@ cbs + 7 +c@ ;  : vc-c2@ cbs + 6 +c@ ;
 : vc-cb dup cbs + @ 0xFFFFFFFF and exec vc-ret@ ;
-177 96 1 0 ' nop     vc-cb!   218 59 0 1 ' vc-up   vc-cb!
-217 46 0 2 ' vc-down vc-cb!   215 47 0 3 ' vc-next vc-cb!
-216 44 0 4 ' vc-prev vc-cb!    13 13 0 5 ' vc-edit vc-cb!
-115 83 0 6 ' vc-save vc-cb!   104 72 0 7 ' vc-help vc-cb!
-117 85 0 8 ' vc-lup  vc-cb!   100 68 0 9 ' vc-ldown vc-cb!
-110 78 0 10 ' vc-lnew vc-cb!  107 75 0 11 ' vc-lkill vc-cb!
-: vkey 12 0 do dup i vc-c1@ = over i vc-c2@ = or
+177 96 1  0 ' nop      vc-cb! 218 59 0  1 ' vc-up    vc-cb!
+217 46 0  2 ' vc-down  vc-cb! 215 47 0  3 ' vc-next  vc-cb!
+216 44 0  4 ' vc-prev  vc-cb!  13 13 0  5 ' vc-edit  vc-cb!
+115 83 0  6 ' vc-save  vc-cb! 104 72 0  7 ' vc-help  vc-cb!
+117 85 0  8 ' vc-lup   vc-cb! 100 68 0  9 ' vc-ldown vc-cb!
+110 78 0 10 ' vc-lnew  vc-cb! 107 75 0 11 ' vc-lkill vc-cb!
+108 76 1 12 ' vc-xline vc-cb! 112 80 1 13 ' vc-xpage vc-cb!
+ 98 66 1 14 ' vc-xblk  vc-cb!
+: vkey 15 0 do dup i vc-c1@ = over i vc-c2@ = or
    if i vc-cb unloop exit then loop false ;
-: view vblk ! 0 page ! vc-reset vc-read begin
-   vdraw vcursor key vkey swap drop until ;
+\ PAGE 7 - Viewer Loop - 113
+: veval vact @ 0= if exit then cls
+  vact @ 1 = if vline @ laddr eval-line then
+  vact @ 2 = if buf eval-page then
+  vact @ 3 = if vblk @ load then
+  htp 112 showline key drop ;
+: vloop begin vdraw vcursor key vkey swap drop until ;
+: view vblk ! 0 page ! vc-reset vc-read
+  begin 0 vact ! vloop veval vact @ 0= until ;
+
+
+
+
+
+
