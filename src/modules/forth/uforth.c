@@ -115,17 +115,42 @@ INLINE uint32_t abs32(int32_t v) {
 #ifdef SUPPORT_FLOAT_FIXED
 #include <math.h>
 #endif
-DCELL parse_num(char *s, uint8_t base) {
+
+int try_parse_num(const char *s, uint8_t len, uint8_t base, DCELL *out_val) {
+    if (s == NULL || len == 0) return 0;
 #ifdef SUPPORT_FLOAT_FIXED
-    double f;
-    char *p = s;
-    while (*p != '\0' && *p != ' ' && *p != '.') ++p;
-    if (*p == '.') {
-        f = strtod(s,NULL);
-        return (DCELL)FIXED_PT_MULT(f);
+    int has_dot = 0;
+    for (uint8_t i = 0; i < len; i++) {
+        if (s[i] == '.') { has_dot = 1; break; }
+    }
+    if (has_dot) {
+        char *endp = NULL;
+        double f = strtod(s, &endp);
+        if (endp == s + len) {
+            *out_val = (DCELL)FIXED_PT_MULT(f);
+            return 1;
+        }
+        return 0;
     }
 #endif
-    return (int32_t)strtol(s,NULL, uforth_uram->base == 10 ? 0 : uforth_uram->base);
+    char *endptr = NULL;
+    int b = (base == 10) ? 0 : base;
+    long val = strtol(s, &endptr, b);
+    if (endptr == s + len) {
+        *out_val = (DCELL)(int32_t)val;
+        return 1;
+    }
+    return 0;
+}
+
+DCELL parse_num(char *s, uint8_t base) {
+    DCELL val = 0;
+    uint8_t len = 0;
+    while (s[len] != '\0' && s[len] != ' ') len++;
+    if (try_parse_num(s, len, base, &val)) {
+        return val;
+    }
+    return 0;
 }
 
 CELL find_word(char* s, uint8_t len, DCELL* addr, bool *immediate, bool *prim);
@@ -703,8 +728,8 @@ uforth_stat uforth_interpret(const char *str) {
         switch (uforth_iram->compiling) {
         case 0:
             if (wd_idx == 0) {
-                DCELL num = parse_num(word,uforth_uram->base);
-                if (num == 0 && word[0] != '0') {
+                DCELL num;
+                if (!try_parse_num(word, uforth_iram->tibwordlen, uforth_uram->base, &num)) {
                     uforth_abort_request_details(ABORT_NAW, word, uforth_iram->tibwordlen);
                     uforth_abort(0);
                     return E_NOT_A_WORD;
@@ -721,8 +746,8 @@ uforth_stat uforth_interpret(const char *str) {
             break;
         case 1:
             if (wd_idx == 0) {
-                DCELL num = parse_num(word,uforth_uram->base);
-                if (num == 0 && word[0] != '0') {
+                DCELL num;
+                if (!try_parse_num(word, uforth_iram->tibwordlen, uforth_uram->base, &num)) {
                     uforth_abort_request_details(ABORT_NAW, word, uforth_iram->tibwordlen);
                     uforth_abort(0);
                     dict_end_def();
