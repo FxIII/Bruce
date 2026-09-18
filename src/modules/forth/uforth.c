@@ -161,15 +161,33 @@ char* uforth_next_word(void) {
     return &(uforth_iram->tib[uforth_iram->tibwordidx]);
 }
 
-void uforth_abort(void) {
+void uforth_abort(CELL pc) {
+    char msg[128];
+
+    // Print Program Counter if executing
+    if (pc > 0) {
+        snprintf(msg, sizeof(msg), " PC: %d\n", (int)pc);
+        forth_output(msg);
+    }
+
+    // Print data stack trace
+    if (uforth_uram->didx >= 0) {
+        int pos = snprintf(msg, sizeof(msg), " D-Stack:");
+        for (int i = 0; i <= uforth_uram->didx; i++) {
+            pos += snprintf(msg + pos, sizeof(msg) - pos, " %lld", (long long)uforth_uram->ds[i]);
+            if (pos >= (int)sizeof(msg) - 16) break;
+        }
+        snprintf(msg + pos, sizeof(msg) - pos, "\n");
+        forth_output(msg);
+    }
+
     // Print return stack trace
     CELL limit = uforth_uram->rsize + uforth_uram->dsize;
     if (uforth_uram->ridx < limit) {
-        char msg[128];
         int pos = snprintf(msg, sizeof(msg), " R-Stack:");
         for (CELL i = uforth_uram->ridx; i < limit; i++) {
             pos += snprintf(msg + pos, sizeof(msg) - pos, " %d", (int)uforth_uram->ds[i]);
-            if (pos >= sizeof(msg) - 10) break;
+            if (pos >= (int)sizeof(msg) - 10) break;
         }
         snprintf(msg + pos, sizeof(msg) - pos, "\n");
         forth_output(msg);
@@ -224,7 +242,7 @@ void uforth_init(void) {
     uforth_make_task(0, TASK0_DS_CELLS, TASK0_RS_CELLS, TASK0_URAM_CELLS);
     uforth_select_task(0);
     uforth_abort_clr();
-    uforth_abort();
+    uforth_abort(0);
     uforth_uram->base = 10;
 }
 
@@ -303,12 +321,14 @@ char* uforth_count_str(CELL addr, CELL* new_addr) {
 } while(0)
 
 uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
+    CELL current_pc = 0;
     while(1) {
         if (wd_idx == 0) {
-            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", wd_idx);
-            uforth_abort();
+            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", current_pc);
+            uforth_abort(current_pc);
             return E_NOT_A_WORD;
         }
+        current_pc = wd_idx;
         cmd = uforth_dict[wd_idx++];
 
         if (cmd > LAST_PRIMITIVE) {
@@ -319,8 +339,8 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
 
         switch (cmd) {
         case 0:
-            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", wd_idx - 1);
-            uforth_abort();
+            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", current_pc);
+            uforth_abort(current_pc);
             return E_NOT_A_WORD;
         case ABORT:
             uforth_abort_request(ABORT_WORD);
@@ -614,7 +634,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             r1 = find_word(str1, uforth_iram->tibwordlen, 0, 0, &b);
             if (r1 == 0) {
                 uforth_abort_request_details(ABORT_NAW, str1, uforth_iram->tibwordlen);
-                uforth_abort();
+                uforth_abort(current_pc);
                 return E_NOT_A_WORD;
             }
             if (b) {
@@ -635,12 +655,12 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix) {
             uforth_select_task(dpop());
             break;
         default:
-            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", wd_idx - 1);
+            uforth_abort_request_val(ABORT_ILLEGAL, "idx %d", current_pc);
             break;
         }
     CHECK_STAT:
         if (uforth_aborting()) {
-            uforth_abort();
+            uforth_abort(current_pc);
             return E_ABORT;
         }
         if (toplevelprim) return UFORTH_OK;
@@ -686,14 +706,14 @@ uforth_stat uforth_interpret(const char *str) {
                 DCELL num = parse_num(word,uforth_uram->base);
                 if (num == 0 && word[0] != '0') {
                     uforth_abort_request_details(ABORT_NAW, word, uforth_iram->tibwordlen);
-                    uforth_abort();
+                    uforth_abort(0);
                     return E_NOT_A_WORD;
                 }
                 dpush32(num);
             } else {
                 stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
                 if (stat != UFORTH_OK) {
-                    uforth_abort();
+                    uforth_abort(0);
                     uforth_abort_clr();
                     return stat;
                 }
@@ -704,7 +724,7 @@ uforth_stat uforth_interpret(const char *str) {
                 DCELL num = parse_num(word,uforth_uram->base);
                 if (num == 0 && word[0] != '0') {
                     uforth_abort_request_details(ABORT_NAW, word, uforth_iram->tibwordlen);
-                    uforth_abort();
+                    uforth_abort(0);
                     dict_end_def();
                     return E_NOT_A_WORD;
                 }
@@ -720,7 +740,7 @@ uforth_stat uforth_interpret(const char *str) {
                 stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
                 if (stat != UFORTH_OK) {
                     uforth_abort_request(ABORT_ILLEGAL);
-                    uforth_abort();
+                    uforth_abort(0);
                     dict_end_def();
                     return stat;
                 }
