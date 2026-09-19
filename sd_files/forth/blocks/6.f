@@ -6,7 +6,7 @@ variable buf 127 allot variable cur variable ord 1 allot
 variable vblk variable page variable vline variable vscr
 variable vact
 : laddr 8 * buf + ;
-
+: 0<> 0= not ;
 
 
 
@@ -15,7 +15,7 @@ variable vact
 
 
 \\ Page 1 - CB Router - 17
-variable cbs 19 allot variable ccurr
+variable cbs 21 allot variable ccurr
 : ccurr@ ccurr @ ; : ccurr+ 1 ccurr +! ;
 : vc-ret@ cbs + 5 +c@ ;
 : vc-c1@ cbs + 7 +c@ ; : vc-c2@ cbs + 6 +c@ ;
@@ -64,7 +64,7 @@ ccurr@ constant hk-to  32 126 0 ' pput  vc-cb!
 
 \\ Page 4 - Edit & IO - 65
 : pedit begin pad 0 showline cursor key handle-key until ;
-: ledit dup >pad cls pedit pad> ;
+: ledit dup >pad cls pedit pad> cls ;
 
 : lst laddr type ;
 : list 16 0 do i . i lst cr loop ;
@@ -90,7 +90,7 @@ string sbar "B:00 P:00 L:00  [H]elp"
   vblk @ >2d sbar 3 +c! sbar 2 +c!
   page @ >2d sbar 8 +c! sbar 7 +c!
   vline @ >2d sbar 13 +c! sbar 12 +c!
-  sbar disp-rows 1- disp-row-height * showline ;
+  sbar 135 disp-row-height - showline ;
 
 
 
@@ -103,62 +103,78 @@ string sbar "B:00 P:00 L:00  [H]elp"
   ord vline @ +c@ 1-
   dup vscr @ 9 + >= if 9 - vscr ! else drop then ;
 
-: vdraw cls >vord vscr! 16 0 do ord i +c@ 1- vscr @ -
+: vdraw >vord vscr! 16 0 do ord i +c@ 1- vscr @ -
   dup 0 >= if i lrow vscr @ - disp-row-height * i laddr
   swap disp-write-ml then disp-rows 1- >=
   if unloop vstatus exit then loop vstatus ;
 
 : vcursor 0 vline @ lrow vscr @ - disp-cursor ;
 
-\\ Page 7 - Controls - 113
-: vc-reset 0 vline ! 0 vscr ! ; : vc-save vblk @ page @ writep ;
-: vc-read  vblk @ page @ readp ; : vc-edit vline @ ledit ;
-: vc-up    vline @ 0> if -1 vline +! then ;
-: vc-down  vline @ 15 < if 1 vline +! then ;
-: vc-next  1 page +! vc-reset vc-read ;
-: vc-prev  page @ 0> if -1 page +! vc-reset vc-read then ;
-: lclear laddr 8 0 do 0 over i + ! loop drop ;
-: lswap  swap laddr swap laddr pad 64 mem-swap ;
-: vc-lup   vline @ if vline @ dup 1- lswap -1 vline +! then ;
-: vc-ldown vline @ 15 <
-  if vline @ dup 1+ lswap 1 vline +! then ;
-: vc-lnew  vline @ insert ;
-: vc-lkill vline @ 15 = if 15 lclear else vline @ outsert then ;
+\\ Page 7 - Navigation & IO - 113
+: vc-reset cls 0 vline ! 0 vscr ! ;
+: vc-read  vc-reset vblk @ page @ readp ;
+: vc-save  vblk @ page @ writep ;
+: vc-edit  vline @ ledit ;
+: vc-up    vline @ 0>  if -1 vline +! then ;
+: vc-down  vline @ 15 < if  1 vline +! then ;
+: vc-next  1 page +! vc-read ;
+: vc-prev  page @ 0> if -1 page +! vc-read then ;
+: vc-bnext 1 vblk +! 0 page ! vc-read ;
+: vc-bprev vblk @ 0> if -1 vblk +! 0 page ! vc-read then ;
 : vc-xline 1 vact ! ; : vc-xpage 2 vact ! ; : vc-xblk 3 vact ! ;
 
-\\ Page 8 - Help Screen - 129
+
+
+
+\\ Page 8 - Line Operations - 129
+: lclear laddr 8 0 do 0 over i + ! loop drop ;
+: lswap  swap laddr swap laddr pad 64 mem-swap ;
+: vc-lmv   dup vline @ + vline @ lswap vline +! ;
+: vc-lup   vline @ 0>  if -1 vc-lmv then ;
+: vc-ldown vline @ 15 < if  1 vc-lmv then ;
+: vc-lnew  vline @ insert ;
+: vc-lkill vline @ 15 = if 15 lclear else vline @ outsert then ;
+
+
+
+
+
+
+
+
+\\ Page 9 - Help Screen - 145
 string ht0 "=== FORTH BLOCK EDIT ==="
 string ht1 "UP/DN (; .) or U/D Shift"
 string ht2 "LF/RG (, /)     Page -/+"
-string ht3 "ENTER           Edit line"
-string ht4 "N / K           New/Kill"
-string ht5 "L/P/B           Run L/P/B"
-string ht6 "S / H / ESC     Save/Help/Exit"
+string ht3 "[ / ]           Blk  -/+"
+string ht4 "ENTER           Edit line"
+string ht5 "N / K           New/Kill"
+string ht6 "L/P/B           Run L/P/B"
+string ht7 "S / H / ESC     Save/Help/Exit"
 string htp "--- press any key ---"
-
 : vc-help
-  cls ht0 0 showline ht1 16 showline
-  ht2 32 showline ht3 48 showline ht4 64 showline
-  ht5 80 showline ht6 96 showline htp 112 showline key drop ;
+  cls ht0 0 showline ht1 14 showline ht2 28 showline
+  ht3 42 showline ht4 56 showline ht5 70 showline
+  ht6 84 showline ht7 98 showline htp 112 showline
+  key drop cls ;
 
-
-\\ Page 9 - Key Dispatch - 145
+\\ Page 10 - Key Dispatch - 161
 ccurr@ constant vk-from
- 177 96 1 ' nop     vc-cb!  218 59 0 ' vc-up    vc-cb!
- 217 46 0 ' vc-down vc-cb!  215 47 0 ' vc-next  vc-cb!
- 216 44 0 ' vc-prev vc-cb!   13 13 0 ' vc-edit  vc-cb!
- 115 83 0 ' vc-save vc-cb!  104 72 0 ' vc-help  vc-cb!
- 117 85 0 ' vc-lup  vc-cb!  100 68 0 ' vc-ldown vc-cb!
- 110 78 0 ' vc-lnew vc-cb!  107 75 0 ' vc-lkill vc-cb!
- 108 76 1 ' vc-xline vc-cb! 112 80 1 ' vc-xpage vc-cb!
-  98 66 1 ' vc-xblk vc-cb!  ccurr@ constant vk-to
+ 177 96 1 ' nop      vc-cb!  218 59 0 ' vc-up    vc-cb!
+ 217 46 0 ' vc-down  vc-cb!  215 47 0 ' vc-next  vc-cb!
+ 216 44 0 ' vc-prev  vc-cb!   93 93 0 ' vc-bnext vc-cb!
+  91 91 0 ' vc-bprev vc-cb!   13 13 0 ' vc-edit  vc-cb!
+ 115 83 0 ' vc-save  vc-cb!  104 72 0 ' vc-help  vc-cb!
+ 117 85 0 ' vc-lup   vc-cb!  100 68 0 ' vc-ldown vc-cb!
+ 110 78 0 ' vc-lnew  vc-cb!  107 75 0 ' vc-lkill vc-cb!
+ 108 76 1 ' vc-xline vc-cb!  112 80 1 ' vc-xpage vc-cb!
+  98 66 1 ' vc-xblk  vc-cb!  ccurr@ constant vk-to
 
 : vkey
   vk-to vk-from do i vc-chor
   if drop i vc-cb unloop exit then loop drop false ;
 
-
-\\ Page 10 - Viewer Loop - 161
+\\ Page 11 - Viewer Loop - 177
 : veval vact @ 0= if exit then cls
   vact @ 1 = if vline @ laddr eval-line then
   vact @ 2 = if buf eval-page then
@@ -167,7 +183,7 @@ ccurr@ constant vk-from
 
 : vloop begin vdraw vcursor key vkey until ;
 
-: view vblk ! 0 page ! vc-reset vc-read
+: view vblk ! 0 page ! vc-read
   begin 0 vact ! vloop veval vact @ 0= until ;
 
 
