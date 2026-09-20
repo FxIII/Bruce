@@ -713,6 +713,25 @@ CELL find_word(char* s, uint8_t slen, DCELL* addr, bool *immediate, bool *primit
     return 0;
 }
 
+void uforth_tib_save_tail(char *dest, size_t max_len) {
+    if (!dest || max_len == 0) return;
+    dest[0] = '\0';
+    if (uforth_iram->tibidx < uforth_iram->tibclen) {
+        size_t avail = (size_t)(uforth_iram->tibclen - uforth_iram->tibidx);
+        if (avail >= max_len) avail = max_len - 1;
+        memcpy(dest, &uforth_iram->tib[uforth_iram->tibidx], avail);
+        dest[avail] = '\0';
+    }
+}
+
+void uforth_tib_restore_tail(const char *src) {
+    CLEAR_TIB();
+    if (src && src[0] != '\0') {
+        uforth_iram->tibclen = min(TIB_SIZE, strlen(src) + 1);
+        memcpy(uforth_iram->tib, src, uforth_iram->tibclen);
+    }
+}
+
 uforth_stat uforth_interpret(const char *str) {
     uforth_stat stat;
     char *word;

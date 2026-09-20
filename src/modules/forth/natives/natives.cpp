@@ -56,7 +56,10 @@ static bool load_module(const NativeModule *mod) {
         mod->bindings();
     }
     if (mod->definitions) {
+        char tail[128];
+        uforth_tib_save_tail(tail, sizeof(tail));
         mod->definitions();
+        uforth_tib_restore_tail(tail);
     }
     log_i("Module '%s' loaded successfully", mod->name);
     return true;
