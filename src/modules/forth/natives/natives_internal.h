@@ -42,6 +42,9 @@ void gps_definitions(void);
 
 void sys_bindings(void);
 
+void ir_bindings(void);
+void ir_definitions(void);
+
 #ifdef __cplusplus
 }
 
@@ -54,6 +57,7 @@ inline const NativeModule* get_native_modules(size_t &count) {
         { "reactor",  ".services",         reactor_bindings,  reactor_definitions, false },
         { "lora",     "lora-init",         lora_bindings,     lora_definitions,    false },
         { "gps",      "gps-init",          gps_bindings,      gps_definitions,     false },
+        { "ir",       "ir-tx",             ir_bindings,       ir_definitions,      false },
     };
     count = sizeof(modules) / sizeof(modules[0]);
     return modules;
