@@ -105,6 +105,46 @@ static void fn_block_read() {
     fn_block_read_page();
 }
 
+static void fn_block_read_bin() {
+    uint32_t size = (uint32_t)dpop();
+    uint32_t offset = (uint32_t)dpop();
+    int num = (int)dpop();
+    CELL addr = (CELL)dpop();
+
+    char filepath[64];
+    snprintf(filepath, sizeof(filepath), "/forth/blocks/%d.bin", num);
+
+    FS *fs = nullptr;
+    if (!getFsStorage(fs)) {
+        log_e("fn_block_read_bin: storage not available");
+        dpush(0);
+        return;
+    }
+
+    if (!fs->exists(filepath)) {
+        log_w("fn_block_read_bin: file '%s' does not exist", filepath);
+        dpush(0);
+        return;
+    }
+
+    File file = fs->open(filepath, "r");
+    if (!file) {
+        log_e("fn_block_read_bin: failed to open '%s'", filepath);
+        dpush(0);
+        return;
+    }
+
+    if (offset > 0) {
+        file.seek(offset);
+    }
+
+    uint8_t *dest = (uint8_t*)&uforth_ram[addr];
+    size_t bytes_read = file.read(dest, size);
+    file.close();
+
+    dpush((DCELL)bytes_read);
+}
+
 static void fn_block_write_page() {
     int page_num = dpop();
     int num = dpop();
@@ -221,6 +261,9 @@ static void fn_block_interpret() {
         return;
     }
 
+    char tail[128];
+    uforth_tib_save_tail(tail, sizeof(tail));
+
     int line_num = 1;
     while (file.available()) {
         String line = file.readStringUntil('\n');
@@ -247,6 +290,7 @@ static void fn_block_interpret() {
         line_num++;
     }
     file.close();
+    uforth_tib_restore_tail(tail);
 }
 
 static bool interpret_ram_line(const char *line_ptr, int max_len, int line_num) {
@@ -289,23 +333,31 @@ static bool interpret_ram_line(const char *line_ptr, int max_len, int line_num) 
 static void fn_eval_line() {
     CELL addr = dpop();
     char *line_ptr = (char*)&uforth_ram[addr];
-    interpret_ram_line(line_ptr, 64, 0);
+    char tail[128];
+    uforth_tib_save_tail(tail, sizeof(tail));
+    if (interpret_ram_line(line_ptr, 64, 0)) {
+        uforth_tib_restore_tail(tail);
+    }
 }
 
 static void fn_eval_page() {
     CELL addr = dpop();
     char *base_ptr = (char*)&uforth_ram[addr];
+    char tail[128];
+    uforth_tib_save_tail(tail, sizeof(tail));
     for (int i = 0; i < 16; i++) {
         char *line_ptr = base_ptr + i * 64;
         if (!interpret_ram_line(line_ptr, 64, i + 1)) {
-            break;
+            return;
         }
     }
+    uforth_tib_restore_tail(tail);
 }
 
 void block_bindings() {
     forth_register("load", fn_block_interpret);          // load          ( num -- )
     forth_register("block-read", fn_block_read);         // block-read    ( addr num -- )
+    forth_register("block-readb", fn_block_read_bin);    // block-readb   ( addr num offset size -- bytes_read )
     forth_register("block-write", fn_block_write);       // block-write   ( addr num -- )
     forth_register("block-readp", fn_block_read_page);   // block-readp   ( addr num page -- )
     forth_register("block-writep", fn_block_write_page); // block-writep  ( addr num page -- )

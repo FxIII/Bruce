@@ -40,7 +40,26 @@ L'ingresso principale per l'esecuzione del codice è la funzione [`uforth_interp
 - Se è una **Parola Utente**, ne compila l'indirizzo di ingresso (`wd_idx`) (o la sequenza `LIT compiling_word JMP` in caso di ricorsione).
 - Se è un **Numero**, compila l'opcode `DLIT` seguito dai 32 bit del valore suddivisi in due celle da 16 bit.
 
-### B. La Macchina Virtuale (`exec`)
+### B. Modello d'Uso del TIB e Chiamate Esterne (`uforth_tib_save_tail` / `uforth_tib_restore_tail`)
+`uforth_interpret()` utilizza il buffer globale unico `uforth_iram->tib` (`TIB_SIZE = 128` byte).
+Quando una parola nativa C++ (es. `load`, `eval-page`, `eval-line` o `use <modulo>`) deve eseguire a sua volta codice Forth tramite `uforth_interpret()`, il TIB della riga corrente in esecuzione verrebbe altrimenti sovrascritto.
+
+Per supportare l'esecuzione trasparente di comandi concatenati sulla stessa riga (es. `use ir 7 load 9 load`) e chiamate annidate, le funzioni C++ che eseguono blocchi, file o definizioni di modulo salvano la coda rimanente della riga (`save_tail`) e, una volta terminato il lavoro, la re-iniettano nel TIB (`restore_tail`) ripartendo puliti da indice 0:
+
+```c
+char tail[128];
+uforth_tib_save_tail(tail, sizeof(tail));
+
+// Esecuzione di righe o definizioni via uforth_interpret(...)
+// ...
+
+uforth_tib_restore_tail(tail);
+```
+
+- **Semantica Pulita da Indice 0**: `restore_tail` esegue il setup standard di `interpret` (`CLEAR_TIB()` e copia della coda), facendo ripartire il ciclo `while` dal carattere 0 della porzione non ancora consumata, oppure terminando normalmente con `ok` se la coda era vuota.
+- **Nesting e Ricorsione**: Consente nesting arbitrario (blocchi che caricano altri blocchi, moduli con dipendenze) senza corruzione di indici o puntatori.
+
+### C. La Macchina Virtuale (`exec`)
 La funzione [`exec()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L272) è il motore di esecuzione:
 - Legge l'opcode: `cmd = uforth_dict[wd_idx++]`.
 - **Opcode Primitivo (`1` <= `cmd` <= `LAST_PRIMITIVE`)**: Un’istruzione `switch (cmd)` esegue l'operazione in C (es. `ADD`, `SUB`, `FETCH`, `STORE`, `LIT`, `JMP`, `CALLC`, `FIND`, ecc.).
@@ -218,9 +237,26 @@ La funzione [`uforth_abort()`](file:///Users/fmontagna/projects/Bruce/src/module
 4. **Control Flow Recovery**:
    Al termine di ogni istruzione nel ciclo `CHECK_STAT` di [`exec()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L582):
    ```c
-   if (uforth_aborting()) {
-       uforth_abort();
-       return E_ABORT;
-   }
-   ```
-   L'abort interrompe immediatamente l'esecuzione nidificata e restituisce il controllo all'interprete o alla REPL, evitando crash del sistema, deadlock o memory corruption.
+    if (uforth_aborting()) {
+        uforth_abort();
+        return E_ABORT;
+    }
+    ```
+    L'abort interrompe immediatamente l'esecuzione nidificata e restituisce il controllo all'interprete o alla REPL, evitando crash del sistema, deadlock o memory corruption.
+
+---
+
+## 4. Modulo Block (I/O su File e Pagine SD)
+
+Il modulo nativo `block` permette la manipolazione e l'interpretazione di file a blocchi di codice Forth (`/forth/blocks/<num>.f`) e di asset binari generici (`/forth/blocks/<num>.bin`):
+
+| Parola Forth | Stack Effect | Descrizione |
+| :--- | :--- | :--- |
+| `load` | `( num -- )` | Apre `/forth/blocks/<num>.f` ed esegue riga per riga il codice Forth. |
+| `block-read` | `( addr num -- )` | Legge i primi 1024 byte di testo (pagina 0) dal blocco `<num>.f` nell'indirizzo `addr`. |
+| `block-readp` | `( addr num page -- )` | Legge una specifica pagina (16 righe da 64 byte) dal file `<num>.f`. |
+| `block-readb` | `( addr num offset size -- bytes_read )` | Legge `size` byte binari arbitrari dal file `/forth/blocks/<num>.bin` a partire da `offset` direttamente nell'indirizzo RAM `addr`. Restituisce i byte letti. |
+| `block-write` | `( addr num -- )` | Scrive 1024 byte da `addr` nella pagina 0 di `<num>.f`. |
+| `block-writep`| `( addr num page -- )` | Scrive una specifica pagina di 16 righe nel file `<num>.f`. |
+| `eval-line` | `( addr -- )` | Interpreta una singola riga di testo da RAM (max 64 byte). |
+| `eval-page` | `( addr -- )` | Interpreta una pagina di 16 righe consecutive da RAM. |
