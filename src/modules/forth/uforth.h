@@ -125,6 +125,8 @@ extern void uforth_abort(CELL pc = 0);
 extern void uforth_abort(CELL pc);
 #endif
 extern uforth_stat uforth_interpret(const char*);
+extern void uforth_tib_save_tail(char *dest, size_t max_len);
+extern void uforth_tib_restore_tail(const char *src);
 extern uforth_stat exec(CELL wd_idx, bool toplevelprim, uint8_t last_exec_rdix);
 extern void uforth_print_str(const char*);
 extern void forth_output(const char*);
