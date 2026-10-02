@@ -4,12 +4,18 @@
 #include "modules/NRF24/nrf_common.h"
 #include "modules/NRF24/nrf_jammer.h"
 #include "modules/NRF24/nrf_mousejack.h"
+#include "modules/NRF24/nrf_rc_monitor.h"
+#include "modules/NRF24/nrf_rc_remote.h"
+#include "modules/NRF24/nrf_sniffer.h"
 #include "modules/NRF24/nrf_spectrum.h"
 
 void NRF24Menu::optionsMenu() {
     options.clear();
     options.push_back({"Information", nrf_info});
     options.push_back({"Spectrum", nrf_spectrum});
+    options.push_back({"Raw Sniffer", nrf_sniffer});
+    options.push_back({"RC Monitor", nrf_rc_monitor});
+    options.push_back({"RC Remote", nrf_rc_remote});
     #if !defined(LITE_VERSION)
     options.push_back({"MouseJack", nrf_mousejack});
     #endif
