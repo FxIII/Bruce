@@ -45,6 +45,9 @@ void sys_bindings(void);
 void ir_bindings(void);
 void ir_definitions(void);
 
+void i2c_bindings(void);
+void i2c_definitions(void);
+
 #ifdef __cplusplus
 }
 
@@ -58,6 +61,7 @@ inline const NativeModule* get_native_modules(size_t &count) {
         { "lora",     "lora-init",         lora_bindings,     lora_definitions,    false },
         { "gps",      "gps-init",          gps_bindings,      gps_definitions,     false },
         { "ir",       "ir-tx",             ir_bindings,       ir_definitions,      false },
+        { "i2c",      "i2c-init",          i2c_bindings,      i2c_definitions,     false },
     };
     count = sizeof(modules) / sizeof(modules[0]);
     return modules;
