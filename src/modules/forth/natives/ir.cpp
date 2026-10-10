@@ -186,8 +186,38 @@ static void fn_enc_denon() {
     dpush(15);
 }
 
+static void fn_ir_fetch() {
+    CELL addr = (CELL)dpop();
+    uint8_t *slot = (uint8_t*)&uforth_ram[addr];
+
+    uint16_t proto  = (uint16_t)(slot[0] | (slot[1] << 8));
+    int32_t dev     = (int32_t)slot[2];
+    int16_t sub_raw = (int16_t)(slot[3] | (slot[4] << 8));
+    int32_t subdev  = (int32_t)sub_raw;
+    int32_t func    = (int32_t)(slot[5] | (slot[6] << 8));
+
+    dpush((DCELL)dev);
+    dpush((DCELL)subdev);
+    dpush((DCELL)func);
+
+    switch (proto) {
+        case (uint16_t)decode_type_t::RC5:        fn_enc_rc5(); break;
+        case (uint16_t)decode_type_t::NEC:        fn_enc_nec(); break;
+        case (uint16_t)decode_type_t::SONY:       fn_enc_sony(); break;
+        case (uint16_t)decode_type_t::SAMSUNG:    fn_enc_samsung(); break;
+        case (uint16_t)decode_type_t::RC6:        fn_enc_rc6(); break;
+        case (uint16_t)decode_type_t::PANASONIC:  fn_enc_panasonic(); break;
+        case (uint16_t)decode_type_t::SHARP:      fn_enc_sharp(); break;
+        case (uint16_t)decode_type_t::JVC:        fn_enc_jvc(); break;
+        case (uint16_t)decode_type_t::DENON:      fn_enc_denon(); break;
+        case IR_PROTO_RCA:                        fn_enc_rca(); break;
+        default:                                  fn_enc_nec(); break;
+    }
+}
+
 void ir_bindings() {
     forth_register("ir-tx", fn_ir_tx);             // ir-tx        ( data proto bits -- ok? )
+    forth_register("ir@", fn_ir_fetch);            // ir@          ( slot_addr -- data proto bits )
 
     // Top 10 Encoders: all take ( dev subdev func -- data proto bits )
     forth_register("ir-nec", fn_enc_nec);          // ir-nec       ( dev subdev func -- data proto bits )
