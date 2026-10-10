@@ -128,6 +128,7 @@ void ConsoleWidget::render() {
         drawInput();
     } else {
         // Draw scroll mode indicator
+        tft.setTextSize(_fontSize);
         tft.setTextColor(bruceConfig.bgColor, bruceConfig.priColor);
         tft.setCursor(_x, _y + (_rows - 1) * _charH);
         tft.print(" -- SCROLL MODE -- ");
@@ -140,7 +141,9 @@ void ConsoleWidget::drawInput() {
     int inputY = _y + (_rows - 1) * _charH;
     // Clear input line area
     tft.fillRect(_x, inputY, _w, _charH, bruceConfig.bgColor);
-    
+    tft.setTextSize(_fontSize);
+    tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
+
     tft.setCursor(_x, inputY);
     tft.print("> ");
 
@@ -153,7 +156,8 @@ void ConsoleWidget::drawInput() {
     int cursorCol = _inputCursor - _inputScroll;
     if (cursorCol >= 0 && cursorCol <= visibleLen) {
         int cursorX = _x + (2 + cursorCol) * _charW;
-        tft.fillRect(cursorX, inputY + _charH - 2, _charW, 2, bruceConfig.priColor);
+        int cursorH = max(2, (int)(2 * _fontSize));
+        tft.fillRect(cursorX, inputY + _charH - cursorH, _charW, cursorH, bruceConfig.priColor);
     }
 }
 
@@ -187,11 +191,18 @@ bool ConsoleWidget::update(String &line, bool &exitRequested) {
     }
 
     if (_scrollMode) {
-        // In scroll mode, arrow keys scroll up/down
+        // In scroll mode, arrow keys scroll up/down (or page up/down if Fn/Sym or Ctrl is held)
         if (!ks.word.empty()) {
             char c = ks.word[0];
-            if (c == (char)0xDA || c == ';') { scrollUp();   render(); }
-            if (c == (char)0xD9 || c == '.') { scrollDown(); render(); }
+            int step = (ks.fn || ks.ctrl) ? max(1, _rows - 2) : 1;
+            if (c == (char)0xDA || c == ';') {
+                for (int s = 0; s < step; s++) scrollUp();
+                render();
+            }
+            if (c == (char)0xD9 || c == '.') {
+                for (int s = 0; s < step; s++) scrollDown();
+                render();
+            }
         }
         return false;
     }

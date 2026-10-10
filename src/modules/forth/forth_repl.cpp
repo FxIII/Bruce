@@ -86,7 +86,9 @@ bool forth_repl_step_once(ConsoleWidget* widget) {
 
 void forthREPL() {
     // 1. Initialize ConsoleWidget (fullscreen terminal)
-    ConsoleWidget widget(0, 0, tftWidth, tftHeight, 1);
+    // Scale font size to 2 on large screens (e.g. Tab5 1280x720) while keeping 1 for compact devices (Cardputer 240x135)
+    uint8_t defaultFontSize = (tftWidth >= 480 || tftHeight >= 480) ? 2 : 1;
+    ConsoleWidget widget(0, 0, tftWidth, tftHeight, defaultFontSize);
     _activeConsole = &widget;
 
     // 2. Use static dictionary buffer in SRAM
