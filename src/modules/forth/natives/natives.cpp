@@ -81,8 +81,8 @@ static void fn_use(void) {
     size_t count = 0;
     const NativeModule *modules = get_native_modules(count);
 
-    // Special dependency check: lora and gps depend on reactor for attach-service
-    if (strcmp(name, "lora") == 0 || strcmp(name, "gps") == 0) {
+    // Special dependency check: lora, gps, and ble depend on reactor for attach-service
+    if (strcmp(name, "lora") == 0 || strcmp(name, "gps") == 0 || strcmp(name, "ble") == 0) {
         for (size_t i = 0; i < count; i++) {
             if (strcmp(modules[i].name, "reactor") == 0) {
                 load_module(&modules[i]);

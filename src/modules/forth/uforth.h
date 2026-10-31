@@ -153,6 +153,7 @@ CELL find_word(char* s, uint8_t slen, DCELL* addr, bool *immediate, bool *primit
 void c_ext_init(void);
 void c_ext_create_cmds(void);
 uforth_stat c_ext_handle_cmds(CELL n);
+void make_word(const char *str, uint8_t str_len);
 void forth_define_native(const char *name, CELL id);
 void uforth_load_core(void);
 

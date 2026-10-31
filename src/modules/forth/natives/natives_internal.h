@@ -48,6 +48,9 @@ void ir_definitions(void);
 void i2c_bindings(void);
 void i2c_definitions(void);
 
+void ble_bindings(void);
+void ble_definitions(void);
+
 #ifdef __cplusplus
 }
 
@@ -62,6 +65,7 @@ inline const NativeModule* get_native_modules(size_t &count) {
         { "gps",      "gps-init",          gps_bindings,      gps_definitions,     false },
         { "ir",       "ir-tx",             ir_bindings,       ir_definitions,      false },
         { "i2c",      "i2c-init",          i2c_bindings,      i2c_definitions,     false },
+        { "ble",      "ble-adv",           ble_bindings,      ble_definitions,     false },
     };
     count = sizeof(modules) / sizeof(modules[0]);
     return modules;
