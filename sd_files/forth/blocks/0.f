@@ -1,15 +1,64 @@
-\ Block 0: Visual Editor - Viewport & Draw
-variable cx variable cy variable sy variable sx variable blk
-variable lines-buf 128 allot
-: L ( n -- addr ) 8 * lines-buf + ;
-: dl ( n --  ) >r lines-buf
-  r@ sy @ + sx @ r> 8 * write-line ;
-: cursor ( -- ) cx @ sx @ - cy @ sy @ - draw-cursor ;
-: move ( dx dy -- )
-  cy @ + 0 max 15 min cy ! cx @ + 0 max 63 min cx ! ;
-: scroll ( -- )
-  cy @ sy @ - 12 >= if 1 sy +! then
-  cy @ sy @ - 0 < if -1 sy +! then
-  cx @ sx @ - 40 >= if 1 sx +! then
-  cx @ sx @ - 0 < if -1 sx +! then ;
-: draw ( -- ) cls 12 0 do i dl loop cursor ;
+\\  1 : Visual Block Editor
+
+
+
+
+
+
+
+
+\\ 10 : Disassembler / Dict   Inspector          
+
+
+
+
+
+
+
+
+
+\\ 20 : Keymap Library (k-map, k-bind, k-do)
+
+
+
+
+
+
+
+
+
+\\ 30 : Universal TV Remote   (Multi-protocol quick zapper)                    
+\\ 31 : TV Database Browser   (200 TV models via 31.bin)
+
+
+
+
+
+
+
+
+\\ 40 : Radio-Telemetry Tools (LoRa RX, GPS, Reactor)
+\\ 41 : BLE Encoder & RGB Controller (GATT Server)
+
+
+
+
+
+
+
+
+\\ 50 : I2C Hardware          (RGB Encoder, Scale, H>RGB)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
