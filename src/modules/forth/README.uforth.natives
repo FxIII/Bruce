@@ -40,6 +40,14 @@ Stable console I/O, commenting, timing, and dictionary inspection native functio
 | `key?` | `fn_key_query` | `( -- ascii \| 0 )` | Non-blocking key press check (returns ASCII code or 0) |
 | `ms` | `fn_ms` | `( ms -- )` | Non-blocking RTOS delay in milliseconds (`vTaskDelay`) |
 | `us` | `fn_us` | `( us -- )` | Microsecond delay (`delayMicroseconds`) |
+| `s"` | `fn_s_quote` | `( "text" -- cstr )` *(IMM)* | Parse literal string to RAM, push `cstr` |
+| `s.` | `fn_s_dot` | `( cstr -- )` | Print null-terminated C-string to `forth_output()` |
+| `type` | `fn_type` | `( addr len -- )` | Print `len` characters from `addr` via `forth_output()` |
+| `slen` | `fn_slen` | `( cstr -- len )` | Compute C-string length using libc `strlen()` |
+| `scount` | `fn_scount` | `( cstr -- addr len )` | Push C-string address and length pair |
+| `s=` | `fn_seq` | `( s1 s2 -- flag )` | Compare two C-strings using libc `strcmp()` |
+| `dict>s` | `fn_dict_to_s` | `( dict_addr ram_addr -- len )` | Unpack dict packed string into RAM C-string (`\0`) |
+| `s>dict` | `fn_s_to_dict` | `( ram_addr -- dict_addr )` | Pack RAM C-string into dictionary |
 
 ### High-Level Core Definitions (`core_definitions`)
 | Forth Word | Forth Definition | Stack Effect | Description |

@@ -54,7 +54,7 @@ Types: `CELL` = 16-bit int (dict), `DCELL` = 64-bit int (RAM/Stack). Flags: `IMM
 | `cf` | 44 | `CALLC` | `( -- stat )` | Execute native C extension handler `c_handle()` |
 | `(find)` | 45 | `FIND` | `( cstr_addr -- xt )` | Find word from RAM counted-str, push XT/opcode or 0 |
 | `(find&)` | 46 | `FIND_ADDR` | `( cstr_addr -- lwa )` | Find word, push dict header (LWA) index |
-| `c!+` | 47 | `CHAR_APPEND` | `( char cstr -- )` | Append byte to RAM counted-str & inc len |
+| `c-append` | 47 | `CHAR_APPEND` | `( char cstr -- )` | Append byte to RAM counted-str & inc len |
 | `+c@` | 48 | `CHAR_FETCH` | `( base off -- byte )` | Read byte from RAM at `base + offset` |
 | `+c!` | 49 | `CHAR_STORE` | `( char base off -- )` | Write byte to RAM at `base + offset` |
 | `+dict-c@` | 50 | `DCHAR_FETCH` | `( base off -- byte )` | Read byte from Dict at `base + offset` |
@@ -72,7 +72,7 @@ Types: `CELL` = 16-bit int (dict), `DCELL` = 64-bit int (RAM/Stack). Flags: `IMM
 - **Stack**: `drop` (26), `dup` (55), `swap` (56), `pick` (7), `>r` (36), `r>` (37), `rpick` (8)
 - **Math/Bitwise**: `+` (12), `-` (13), `*` (14), `/` (15), `and` (16), `or` (21), `xor` (22), `invert` (33), `lshift` (23), `rshift` (24)
 - **Logic**: `0=` (25), `<0` (30)
-- **Memory**: `@` (38), `!` (39), `dict@` (40), `dict!` (41), `+c@` (48), `+c!` (49), `+dict-c@` (50), `c!+` (47), `ram` (11), `uram` (6)
+- **Memory**: `@` (38), `!` (39), `dict@` (40), `dict!` (41), `+c@` (48), `+c!` (49), `+dict-c@` (50), `c-append` (47), `ram` (11), `uram` (6)
 - **Control**: `jmp` (17), `0jmp?` (18), `0skip?` (19), `exec` (29), `;` (20), `abort` (3)
 - **Dict/Compile**: `:` (4), `_create` (52), `immediate` (5), `here` (9), `,` (34), `d,` (35), `dummy,` (10), `postpone` (51), `,"` (42), `_allot1` (43), `lit` (1), `dlit` (2)
 - **Text/Parsing**: `next-word` (27), `next-char` (28), `>num` (53), `>fnum` (54), `(find)` (45), `(find&)` (46)

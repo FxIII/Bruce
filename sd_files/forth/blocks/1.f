@@ -66,7 +66,7 @@ ccurr@ constant hk-to  32 126 0 ' pput  vc-cb!
 : pedit begin pad 0 showline cursor key handle-key until ;
 : ledit dup >pad cls pedit pad> cls ;
 
-: lst laddr type ;
+: lst laddr s. ;
 : list 16 0 do i . i lst cr loop ;
 
 : read buf swap block-read ;

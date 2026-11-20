@@ -321,7 +321,7 @@ void uforth_load_prims(void) {
     store_prim("postpone", POSTPONE); make_immediate();
     store_prim("next-word", NEXT);
     store_prim("next-char", CNEXT);
-    store_prim("c!+", CHAR_APPEND);
+    store_prim("c-append", CHAR_APPEND);
     store_prim("+c@", CHAR_FETCH);
     store_prim("+c!", CHAR_STORE);
     store_prim("+dict-c@", DCHAR_FETCH);

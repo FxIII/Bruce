@@ -103,6 +103,124 @@ static void fn_key_query() {
     dpush(0);
 }
 
+#define OP_DLIT 2
+
+static void fn_s_quote() {
+    if (uforth_iram->tibidx < uforth_iram->tibclen && uforth_iram->tib[uforth_iram->tibidx] == ' ') {
+        uforth_iram->tibidx++;
+    }
+
+    char buf[128];
+    int len = 0;
+    while (uforth_iram->tibidx < uforth_iram->tibclen && len < (int)sizeof(buf) - 1) {
+        char c = uforth_iram->tib[uforth_iram->tibidx++];
+        if (c == '"') break;
+        buf[len++] = c;
+    }
+    buf[len] = '\0';
+
+    if (uforth_iram->compiling == 0) {
+        // Interpreter mode: rotating buffer in PAD to support multiple literals per line
+        static int pad_slot = 0;
+        pad_slot = (pad_slot == 0) ? 32 : 0; // Toggle between offset 1 and 33
+        DCELL target_idx = PAD_ADDR + 1 + pad_slot;
+        char *pad_str = (char *)&uforth_ram[target_idx];
+        memcpy(pad_str, buf, len + 1);
+        dpush(target_idx);
+    } else {
+        // Compile mode: allocate RAM for anonymous string
+        int cells = (len + 1 + (int)sizeof(DCELL) - 1) / (int)sizeof(DCELL);
+        DCELL ram_idx = VAR_ALLOT(cells);
+        memcpy(&uforth_ram[ram_idx], buf, len + 1);
+
+        // Compile DLIT <ram_idx>
+        dict_append(OP_DLIT);
+        dict_append((uint16_t)(((uint32_t)ram_idx) >> 16));
+        dict_append((uint16_t)(((uint32_t)ram_idx) & 0xFFFF));
+    }
+}
+
+static void fn_s_dot() {
+    DCELL addr = dpop();
+    const char *s = (const char *)&uforth_ram[addr];
+    forth_output(s);
+}
+
+static void fn_type() {
+    DCELL len = dpop();
+    DCELL addr = dpop();
+    if (len <= 0) return;
+    const char *s = (const char *)&uforth_ram[addr];
+    char buf[128];
+    while (len > 0) {
+        size_t chunk = (len < (DCELL)(sizeof(buf) - 1)) ? (size_t)len : (sizeof(buf) - 1);
+        memcpy(buf, s, chunk);
+        buf[chunk] = '\0';
+        forth_output(buf);
+        s += chunk;
+        len -= chunk;
+    }
+}
+
+static void fn_slen() {
+    DCELL addr = dpop();
+    const char *s = (const char *)&uforth_ram[addr];
+    dpush((DCELL)strlen(s));
+}
+
+static void fn_scount() {
+    DCELL addr = dpop();
+    const char *s = (const char *)&uforth_ram[addr];
+    dpush(addr);
+    dpush((DCELL)strlen(s));
+}
+
+static void fn_seq() {
+    DCELL a2 = dpop();
+    DCELL a1 = dpop();
+    const char *s1 = (const char *)&uforth_ram[a1];
+    const char *s2 = (const char *)&uforth_ram[a2];
+    dpush(strcmp(s1, s2) == 0 ? 1 : 0);
+}
+
+static void fn_dict_to_s() {
+    DCELL ram_addr = dpop();
+    CELL dict_addr = (CELL)dpop();
+    CELL len = uforth_dict[dict_addr];
+    char *dst = (char *)&uforth_ram[ram_addr];
+    size_t d_idx = dict_addr + 1;
+    size_t r_idx = 0;
+    while (r_idx < len) {
+        CELL cell = uforth_dict[d_idx++];
+#ifdef USE_LITTLE_ENDIAN
+        dst[r_idx++] = (char)(cell & 0xFF);
+        if (r_idx < len) dst[r_idx++] = (char)((cell >> 8) & 0xFF);
+#else
+        dst[r_idx++] = (char)((cell >> 8) & 0xFF);
+        if (r_idx < len) dst[r_idx++] = (char)(cell & 0xFF);
+#endif
+    }
+    dst[len] = '\0';
+    dpush(len);
+}
+
+static void fn_s_to_dict() {
+    DCELL ram_addr = dpop();
+    const char *s = (const char *)&uforth_ram[ram_addr];
+    size_t len = strlen(s);
+    CELL dict_addr = dict->here;
+    dict_append((CELL)len);
+    size_t i = 0;
+    while (i < len) {
+        CELL cell = BYTEPACK_FIRST((uint8_t)s[i++]);
+        if (i < len) {
+            cell |= BYTEPACK_SECOND((uint8_t)s[i++]);
+        }
+        dict_append(cell);
+    }
+    dpush(dict_addr);
+}
+
 void core_bindings() {
     forth_register("emit", fn_emit);
     forth_register("cr", fn_cr);
@@ -114,6 +232,16 @@ void core_bindings() {
     forth_register("key?", fn_key_query);
     forth_register("ms", fn_ms);
     forth_register("us", fn_us);
+
+    // String operations (C-strings in uforth_ram)
+    forth_register("s\"", fn_s_quote); make_immediate();
+    forth_register("s.", fn_s_dot);
+    forth_register("type", fn_type);
+    forth_register("slen", fn_slen);
+    forth_register("scount", fn_scount);
+    forth_register("s=", fn_seq);
+    forth_register("dict>s", fn_dict_to_s);
+    forth_register("s>dict", fn_s_to_dict);
 }
 
 void core_definitions() {

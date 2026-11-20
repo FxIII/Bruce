@@ -22,7 +22,7 @@ variable scaleRead 1 allot
   0x70 8 scale@ scaleRead !
   0x78 8 scale@ scaleRead 1 + ! ;
 : scale.
-  scale-c@ scaleRead type ;
+  scale-c@ scaleRead s. ;
 : scaleLed ( index rgb)
   swap 3 * 0x30 + 3 scale! drop ;  
 

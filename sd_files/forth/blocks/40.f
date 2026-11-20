@@ -7,10 +7,10 @@ variable c variable lc
 1000 ' c+ every ' ch attach-service
 
 868 lora-init
-: print-rx pad 1 + type cr ; ' print-rx is on-lora
+: print-rx pad 1 + s. cr ; ' print-rx is on-lora
 
 gps-init
-: print-gps c @ 10 mod 0= if pad gps-pos-str pad type cr then ;
+: print-gps c @ 10 mod 0= if pad gps-pos-str pad s. cr then ;
 ' print-gps is on-gps
 
 react
