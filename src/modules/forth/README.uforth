@@ -28,7 +28,7 @@ The primary entry point for code execution is [`uforth_interpret(const char *str
   - **If User Word (`primitive == 0`)**: Enters the VM threaded-code loop, sequentially executing the cells that make up the word until encountering the `EXIT` opcode (20) or an error.
   - If `exec()` returns an error status other than `UFORTH_OK`, `uforth_interpret` calls [`uforth_abort()`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L140), clears the abort flag via `uforth_abort_clr()`, and returns the error code (`stat`).
 - **Word NOT Found (`wd_idx == 0`)**:
-  - Attempts numeric parsing via [`parse_num(word, uforth_uram->base)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L94). Supports decimal (base 10), hexadecimal, and fixed/floating point numbers when `SUPPORT_FLOAT_FIXED` is enabled.
+  - Attempts numeric parsing via [`parse_num(word, uforth_uram->base)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L94). Supports integers (decimal, hex), micro fixed-point (mandatory `.` without `f`/`e`, scaled to $10^6$), and 32-bit floats (mandatory `.` with `f`/`F` or `e`/`E`).
   - **If Valid Number**: Pushes the value onto the Data Stack as a 32-bit integer using [`dpush32(num)`](file:///Users/fmontagna/projects/Bruce/src/modules/forth/uforth.c#L67).
   - **If NOT a Valid Number**: Triggers an `ABORT_NAW` (*Not A Word*) abort request, stores the invalid token in `uforth_abort_details` via `uforth_abort_request_details`, invokes `uforth_abort()`, and returns `E_NOT_A_WORD`.
 

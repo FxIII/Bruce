@@ -48,6 +48,36 @@ Stable console I/O, commenting, timing, and dictionary inspection native functio
 | `s=` | `fn_seq` | `( s1 s2 -- flag )` | Compare two C-strings using libc `strcmp()` |
 | `dict>s` | `fn_dict_to_s` | `( dict_addr ram_addr -- len )` | Unpack dict packed string into RAM C-string (`\0`) |
 | `s>dict` | `fn_s_to_dict` | `( ram_addr -- dict_addr )` | Pack RAM C-string into dictionary |
+| `*/` | `fn_star_slash` | `( n1 n2 n3 -- [n1*n2]/n3 )` | Rational scaling with 128-bit overflow fallback |
+| `*/mod` | `fn_star_slash_mod` | `( n1 n2 n3 -- rem quot )` | Rational scaling with remainder |
+| `u*` | `fn_u_mul` | `( u1 u2 -- u3 )` | Micro fixed-point multiplication: `(u1*u2)/1000000` |
+| `u/` | `fn_u_div` | `( u1 u2 -- u3 )` | Micro fixed-point division: `(u1*1000000)/u2` |
+| `u.` | `fn_u_dot` | `( u -- )` | Print micro fixed-point formatted decimal |
+
+### On-Demand Math Modules (`use math` / `use float`)
+
+#### Module `math` (`use math`) - Micro Fixed-Point Math:
+| Forth Word | Stack Effect | Description |
+| :--- | :--- | :--- |
+| `usqrt` | `( u -- res )` | Exact integer square root in micro units |
+| `usin` | `( angle -- sin )` | CORDIC integer sine in micro-radians |
+| `ucos` | `( angle -- cos )` | CORDIC integer cosine in micro-radians |
+| `utan` | `( angle -- tan )` | CORDIC integer tangent |
+| `uatan2` | `( y x -- angle )` | CORDIC four-quadrant arctangent |
+| `uln` | `( u -- res )` | Natural logarithm in micro units |
+| `uexp` | `( u -- res )` | Exponential ($e^u$) in micro units |
+| `upow` | `( base exp -- res )` | Power ($base^{exp}$) in micro units |
+
+#### Module `float` (`use float`) - Hardware 32-bit FPU:
+| Forth Word | Stack Effect | Description |
+| :--- | :--- | :--- |
+| `f+`, `f-`, `f*`, `f/` | `( f1 f2 -- f3 )` | Hardware FPU arithmetic |
+| `f.` | `( f -- )` | Output 32-bit float to console |
+| `fsqrt`, `fsin`, `fcos`, `ftan` | `( f -- res )` | Hardware / libc single-precision math |
+| `fatan2` | `( y x -- angle )` | Hardware / libc single-precision atan2 |
+| `fexp`, `fln`, `fpow` | `( ... -- res )` | Single-precision transcendental functions |
+| `u>f`, `f>u` | `( u -- f )` / `( f -- u )` | Bridge conversions between micro and float |
+| `s>f`, `f>s` | `( n -- f )` / `( f -- n )` | Bridge conversions between integer and float |
 
 ### High-Level Core Definitions (`core_definitions`)
 | Forth Word | Forth Definition | Stack Effect | Description |

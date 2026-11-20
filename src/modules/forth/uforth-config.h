@@ -5,9 +5,6 @@
 #define INLINE
 #define MAX_DICT_CELLS      8192    /* 16KB dictionary */
 #define USE_LITTLE_ENDIAN
-#define FIXED_PT_DIVISOR    ((double)(1000000.0))
-#define FIXED_PT_PLACES     6
-#define FIXED_PT_MULT(x)    (x*(1000000))
 
 /* Cardputer (ESP32-S3) has plenty of SRAM (512KB)
 */

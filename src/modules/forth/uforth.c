@@ -112,32 +112,102 @@ INLINE uint32_t abs32(int32_t v) {
     return (v < 0) ? v*-1 : v;
 }
 
-#ifdef SUPPORT_FLOAT_FIXED
-#include <math.h>
-#endif
-
 int try_parse_num(const char *s, uint8_t len, uint8_t base, DCELL *out_val) {
-    if (s == NULL || len == 0) return 0;
-#ifdef SUPPORT_FLOAT_FIXED
-    int has_dot = 0;
+    if (s == NULL || len == 0 || out_val == NULL) return 0;
+
+    // Check if the token contains a dot '.'
+    int dot_idx = -1;
     for (uint8_t i = 0; i < len; i++) {
-        if (s[i] == '.') { has_dot = 1; break; }
+        if (s[i] == '.') {
+            if (dot_idx >= 0) return 0; // Multiple dots -> malformed
+            dot_idx = (int)i;
+        }
     }
-    if (has_dot) {
-        char *endp = NULL;
-        double f = strtod(s, &endp);
-        if (endp == s + len) {
-            *out_val = (DCELL)FIXED_PT_MULT(f);
+
+    if (dot_idx >= 0) {
+        // NON-INTEGER PATH: contains mandatory '.'
+        // Float32 if contains 'e'/'E' or ends with 'f'/'F'
+        int has_exp = 0;
+        for (uint8_t i = 0; i < len; i++) {
+            if (s[i] == 'e' || s[i] == 'E') { has_exp = 1; break; }
+        }
+        int ends_with_f = (s[len - 1] == 'f' || s[len - 1] == 'F');
+
+        if (has_exp || ends_with_f) {
+            // A. Float32 IEEE-754 parser
+            char buf[64];
+            uint8_t parse_len = ends_with_f ? (len - 1) : len;
+            if (parse_len >= sizeof(buf) || parse_len == 0) return 0;
+            memcpy(buf, s, parse_len);
+            buf[parse_len] = '\0';
+
+            char *endp = NULL;
+            float f = strtof(buf, &endp);
+            if (endp == buf + parse_len) {
+                uint32_t bits;
+                memcpy(&bits, &f, sizeof(float));
+                *out_val = (DCELL)(int32_t)bits;
+                return 1;
+            }
+            return 0; // Malformed float
+        } else {
+            // B. Micro-Fixed Point (10^6) integer parser
+            uint8_t idx = 0;
+            int negative = 0;
+            if (s[0] == '-') { negative = 1; idx++; }
+            else if (s[0] == '+') { idx++; }
+            if (idx >= len) return 0;
+
+            int64_t int_part = 0;
+            int has_int_digits = 0;
+            while (idx < (uint8_t)dot_idx) {
+                if (s[idx] < '0' || s[idx] > '9') return 0;
+                int_part = int_part * 10 + (s[idx] - '0');
+                has_int_digits = 1;
+                idx++;
+            }
+            idx++; // skip '.'
+
+            int64_t frac_part = 0;
+            int frac_digits = 0;
+            while (idx < len) {
+                if (s[idx] < '0' || s[idx] > '9') return 0;
+                if (frac_digits < 6) {
+                    frac_part = frac_part * 10 + (s[idx] - '0');
+                    frac_digits++;
+                } else if (frac_digits == 6) {
+                    if (s[idx] >= '5') frac_part++;
+                    frac_digits++;
+                }
+                idx++;
+            }
+
+            if (!has_int_digits && frac_digits == 0) return 0;
+
+            while (frac_digits < 6) {
+                frac_part *= 10;
+                frac_digits++;
+            }
+
+            int64_t total = int_part * 1000000LL + frac_part;
+            if (negative) total = -total;
+
+            *out_val = (DCELL)total;
             return 1;
         }
-        return 0;
     }
-#endif
+
+    // C. INTEGER PATH: no '.' present
+    char buf[64];
+    if (len >= sizeof(buf)) return 0;
+    memcpy(buf, s, len);
+    buf[len] = '\0';
+
     char *endptr = NULL;
     int b = (base == 10) ? 0 : base;
-    long val = strtol(s, &endptr, b);
-    if (endptr == s + len) {
-        *out_val = (DCELL)(int32_t)val;
+    long long val = strtoll(buf, &endptr, b);
+    if (endptr == buf + len) {
+        *out_val = (DCELL)val;
         return 1;
     }
     return 0;

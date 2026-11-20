@@ -221,6 +221,82 @@ static void fn_s_to_dict() {
     dpush(dict_addr);
 }
 
+// ── Math & Micro-Fixed Point (Core) ─────────────────────────────────────────
+
+static void fn_star_slash() {
+    DCELL n3 = dpop();
+    DCELL n2 = dpop();
+    DCELL n1 = dpop();
+    if (n3 == 0) { forth_output("ERR: div by zero\n"); dpush(0); return; }
+    int64_t prod;
+    if (!__builtin_mul_overflow(n1, n2, &prod)) {
+        dpush(prod / n3);
+    } else {
+        double res = ((double)n1 * (double)n2) / (double)n3;
+        dpush((DCELL)res);
+    }
+}
+
+static void fn_star_slash_mod() {
+    DCELL n3 = dpop();
+    DCELL n2 = dpop();
+    DCELL n1 = dpop();
+    if (n3 == 0) { forth_output("ERR: div by zero\n"); dpush(0); dpush(0); return; }
+    int64_t prod;
+    if (!__builtin_mul_overflow(n1, n2, &prod)) {
+        dpush(prod % n3);
+        dpush(prod / n3);
+    } else {
+        double q = ((double)n1 * (double)n2) / (double)n3;
+        int64_t quot = (int64_t)q;
+        dpush(0); // rem
+        dpush(quot);
+    }
+}
+
+static void fn_u_mul() {
+    DCELL u2 = dpop();
+    DCELL u1 = dpop();
+    int64_t prod;
+    if (!__builtin_mul_overflow(u1, u2, &prod)) {
+        dpush(prod / 1000000LL);
+    } else {
+        double res = ((double)u1 * (double)u2) / 1000000.0;
+        dpush((DCELL)res);
+    }
+}
+
+static void fn_u_div() {
+    DCELL u2 = dpop();
+    DCELL u1 = dpop();
+    if (u2 == 0) { forth_output("ERR: div by zero\n"); dpush(0); return; }
+    int64_t prod;
+    if (!__builtin_mul_overflow(u1, 1000000LL, &prod)) {
+        dpush(prod / u2);
+    } else {
+        double res = ((double)u1 * 1000000.0) / (double)u2;
+        dpush((DCELL)res);
+    }
+}
+
+static void fn_u_dot() {
+    DCELL u = dpop();
+    if (u < 0) {
+        forth_output("-");
+        u = -u;
+    }
+    DCELL int_part = u / 1000000LL;
+    DCELL frac_part = u % 1000000LL;
+    char buf[48];
+    int len = snprintf(buf, sizeof(buf), "%lld.%06lld", (long long)int_part, (long long)frac_part);
+    while (len > 0 && buf[len - 1] == '0' && buf[len - 2] != '.') {
+        buf[--len] = '\0';
+    }
+    buf[len++] = ' ';
+    buf[len] = '\0';
+    forth_output(buf);
+}
+
 void core_bindings() {
     forth_register("emit", fn_emit);
     forth_register("cr", fn_cr);
@@ -242,6 +318,13 @@ void core_bindings() {
     forth_register("s=", fn_seq);
     forth_register("dict>s", fn_dict_to_s);
     forth_register("s>dict", fn_s_to_dict);
+
+    // Math & Micro-Fixed (always active in core)
+    forth_register("*/", fn_star_slash);
+    forth_register("*/mod", fn_star_slash_mod);
+    forth_register("u*", fn_u_mul);
+    forth_register("u/", fn_u_div);
+    forth_register("u.", fn_u_dot);
 }
 
 void core_definitions() {

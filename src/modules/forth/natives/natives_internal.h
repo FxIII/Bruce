@@ -51,6 +51,9 @@ void i2c_definitions(void);
 void ble_bindings(void);
 void ble_definitions(void);
 
+void math_bindings(void);
+void float_bindings(void);
+
 #ifdef __cplusplus
 }
 
@@ -66,6 +69,8 @@ inline const NativeModule* get_native_modules(size_t &count) {
         { "ir",       "ir-tx",             ir_bindings,       ir_definitions,      false },
         { "i2c",      "i2c-init",          i2c_bindings,      i2c_definitions,     false },
         { "ble",      "ble-adv",           ble_bindings,      ble_definitions,     false },
+        { "math",     "usqrt",             math_bindings,     nullptr,             false },
+        { "float",    "f+",                float_bindings,    nullptr,             false },
     };
     count = sizeof(modules) / sizeof(modules[0]);
     return modules;
