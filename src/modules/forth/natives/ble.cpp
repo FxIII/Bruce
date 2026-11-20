@@ -5,6 +5,11 @@
 #if !defined(LITE_VERSION) && CONFIG_BT_ENABLED
 
 #include <NimBLEDevice.h>
+#include "modules/ble/ble_p4_compat.h"
+
+#ifndef ESP_PWR_LVL_P9
+#define ESP_PWR_LVL_P9 9
+#endif
 
 // ---------------------------------------------------------------------------
 // Operational variables (pointers inside uforth_ram)

@@ -138,10 +138,22 @@ static void tab5KbPoll() {
         }
 
         switch (map.keycode) {
-            case TAB5_HID_LEFT: PrevPress = true; break;
-            case TAB5_HID_RIGHT: NextPress = true; break;
-            case TAB5_HID_UP: UpPress = true; break;
-            case TAB5_HID_DOWN: DownPress = true; break;
+            case TAB5_HID_LEFT:
+                PrevPress = true;
+                pendingKey.word.emplace_back((char)0xD8);
+                break;
+            case TAB5_HID_RIGHT:
+                NextPress = true;
+                pendingKey.word.emplace_back((char)0xD7);
+                break;
+            case TAB5_HID_UP:
+                UpPress = true;
+                pendingKey.word.emplace_back((char)0xDA);
+                break;
+            case TAB5_HID_DOWN:
+                DownPress = true;
+                pendingKey.word.emplace_back((char)0xD9);
+                break;
             case TAB5_HID_ENTER:
                 pendingKey.enter = true;
                 SelPress = true;
@@ -154,6 +166,14 @@ static void tab5KbPoll() {
             case TAB5_HID_BACKSPACE:
             case TAB5_HID_DELETE: pendingKey.del = true; break;
             case TAB5_HID_TAB: pendingKey.word.emplace_back('\t'); break;
+            case 0x2C: // HID Space: Ctrl+Space acts as Opt / GUI key (toggle scroll mode)
+                if (ctrl) {
+                    pendingKey.gui = true;
+                    if (!pendingKey.word.empty() && pendingKey.word.back() == ' ') {
+                        pendingKey.word.pop_back();
+                    }
+                }
+                break;
             default: break;
         }
         keyPulse = true;
