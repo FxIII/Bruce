@@ -3,7 +3,7 @@
 Architecture and stable core native functions reference for `natives/`.
 
 > [!NOTE]
-> This documentation describes the overall architecture and main core native module (`natives/core.cpp`). For reference on other available native modules (e.g. `sys.cpp`, `display.cpp`, `block.cpp`, `reactor.cpp`, `lora.cpp`, `gps.cpp`), refer directly to the respective `.cpp` files in `natives/`. It is not required to update this document when adding or extending native modules.
+> This documentation describes the overall architecture and main core native module (`natives/core.cpp`). For reference on other available native modules (e.g. `sys.cpp`, `display.cpp`, `block.cpp`, `reactor.cpp`, `lora.cpp`, `gps.cpp`, `ble.cpp`, `i2c.cpp`, `ir.cpp`), refer directly to the respective `.cpp` files in `natives/`. It is not required to update this document when adding or extending native modules.
 
 ---
 

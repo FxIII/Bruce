@@ -1,15 +1,15 @@
 \\ Page 0 - Setup & Var - 1
 marker -- use display 0 constant false 1 constant true
-2 disp-font! : cols disp-cols ; : showline disp-write-ml ;
+: f! disp-cols 50 > if 7 else 2 then disp-font! ; f!
+: cols disp-cols ; : showline disp-write-ml ;
 : >2d dup 10 / 48 + swap 10 mod 48 + ;
 variable buf 127 allot variable cur variable ord 1 allot
 variable vblk variable page variable vline variable vscr
 variable vact
 : laddr 8 * buf + ;
 : 0<> 0= not ;
-
-
-
+: btm disp-rows 1- disp-row-height * ;
+: vrows disp-rows 2 - ;
 
 
 
@@ -90,7 +90,7 @@ string sbar "B:00 P:00 L:00  [H]elp"
   vblk @ >2d sbar 3 +c! sbar 2 +c!
   page @ >2d sbar 8 +c! sbar 7 +c!
   vline @ >2d sbar 13 +c! sbar 12 +c!
-  sbar 135 disp-row-height - showline ;
+  sbar btm showline ;
 
 
 
@@ -101,7 +101,7 @@ string sbar "B:00 P:00 L:00  [H]elp"
 
 : vscr! vline @ lrow dup vscr @ < if vscr ! exit then drop
   ord vline @ +c@ 1-
-  dup vscr @ 9 + >= if 9 - vscr ! else drop then ;
+  dup vscr @ vrows + >= if vrows - vscr ! else drop then ;
 
 : vdraw >vord vscr! 16 0 do ord i +c@ 1- vscr @ -
   dup 0 >= if i lrow vscr @ - disp-row-height * i laddr
@@ -179,7 +179,7 @@ ccurr@ constant vk-from
   vact @ 1 = if vline @ laddr eval-line then
   vact @ 2 = if buf eval-page then
   vact @ 3 = if vblk @ load then
-  disp-refresh htp 112 showline key drop ;
+  disp-refresh htp btm showline key drop ;
 
 : vloop begin vdraw vcursor key vkey until ;
 

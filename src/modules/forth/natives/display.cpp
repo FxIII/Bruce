@@ -3,20 +3,116 @@
 #include "../forth_repl.h"
 #include "core/display.h"
 #include "font8x12.h"
+#include "font10x18.h"
 #include <Arduino.h>
 
-static int _currentFontSize = 1; // 1 = 6x8px (GLCD), 2 = 8x12px (Monospace 8x12), 3 = 12x16px (GLCD x2)
+static int _currentFontSize = 1; 
 
 static void getCharDimensions(int size, int &char_w, int &char_h) {
-    if (size == 2) {
-        char_w = 8;
-        char_h = 12;
-    } else if (size == 3) {
-        char_w = 12;
-        char_h = 16;
-    } else {
-        char_w = 6;
-        char_h = 8;
+    switch (size) {
+        case 1:  char_w = 6;  char_h = 8;  break; // GLCD 1x
+        case 2:  char_w = 8;  char_h = 12; break; // Font8x12 1x
+        case 3:  char_w = 10; char_h = 18; break; // Terminus 1x
+        case 4:  char_w = 12; char_h = 16; break; // GLCD 2x
+        case 5:  char_w = 16; char_h = 24; break; // Font8x12 2x
+        case 6:  char_w = 18; char_h = 24; break; // GLCD 3x
+        case 7:  char_w = 20; char_h = 36; break; // Terminus 2x
+        case 8:  char_w = 24; char_h = 32; break; // GLCD 4x
+        case 9:  char_w = 24; char_h = 36; break; // Font8x12 3x
+        case 10: char_w = 30; char_h = 54; break; // Terminus 3x
+        case 11: char_w = 32; char_h = 48; break; // Font8x12 4x
+        default: char_w = 6;  char_h = 8;  break;
+    }
+}
+
+static void drawGlyph8x12(int x_base, int y_base, const uint8_t glyph[12], int scale, uint16_t color) {
+    if (scale == 1) {
+        tft.drawXBitmap(x_base, y_base, glyph, 8, 12, color);
+        return;
+    }
+    for (int r = 0; r < 12; r++) {
+        uint8_t bits = glyph[r];
+        if (!bits) continue;
+        int y = y_base + r * scale;
+        int col = 0;
+        while (col < 8) {
+            if (bits & (1 << col)) {
+                int start_col = col;
+                while (col < 8 && (bits & (1 << col))) {
+                    col++;
+                }
+                int run_len = col - start_col;
+                tft.fillRect(x_base + start_col * scale, y, run_len * scale, scale, color);
+            } else {
+                col++;
+            }
+        }
+    }
+}
+
+static void drawGlyph10x18(int x_base, int y_base, const uint16_t glyph[18], int scale, uint16_t color) {
+    for (int r = 0; r < 18; r++) {
+        uint16_t bits = glyph[r];
+        if (!bits) continue;
+        int y = y_base + r * scale;
+        int col = 0;
+        while (col < 10) {
+            if (bits & (1 << (9 - col))) {
+                int start_col = col;
+                while (col < 10 && (bits & (1 << (9 - col)))) {
+                    col++;
+                }
+                int run_len = col - start_col;
+                tft.fillRect(x_base + start_col * scale, y, run_len * scale, scale, color);
+            } else {
+                col++;
+            }
+        }
+    }
+}
+
+static void drawTextLine(const char *buf, int len, int x_pixel, int y_pixel, int char_w) {
+    int glcd_scale = 0;
+    if (_currentFontSize == 1) glcd_scale = 1;
+    else if (_currentFontSize == 4) glcd_scale = 2;
+    else if (_currentFontSize == 6) glcd_scale = 3;
+    else if (_currentFontSize == 8) glcd_scale = 4;
+
+    if (glcd_scale > 0) {
+        tft.setTextFont(1);
+        tft.setTextSize(glcd_scale);
+        tft.setCursor(x_pixel, y_pixel);
+        tft.print(buf);
+        return;
+    }
+
+    int f8_scale = 0;
+    if (_currentFontSize == 2) f8_scale = 1;
+    else if (_currentFontSize == 5) f8_scale = 2;
+    else if (_currentFontSize == 9) f8_scale = 3;
+    else if (_currentFontSize == 11) f8_scale = 4;
+
+    if (f8_scale > 0) {
+        for (int i = 0; i < len; i++) {
+            char c = buf[i];
+            if (c < 32 || c > 126) c = '?';
+            drawGlyph8x12(x_pixel + i * char_w, y_pixel, font8x12[c - 32], f8_scale, bruceConfig.priColor);
+        }
+        return;
+    }
+
+    int f10_scale = 0;
+    if (_currentFontSize == 3) f10_scale = 1;
+    else if (_currentFontSize == 7) f10_scale = 2;
+    else if (_currentFontSize == 10) f10_scale = 3;
+
+    if (f10_scale > 0) {
+        for (int i = 0; i < len; i++) {
+            char c = buf[i];
+            if (c < 32 || c > 126) c = '?';
+            drawGlyph10x18(x_pixel + i * char_w, y_pixel, font10x18[c - 32], f10_scale, bruceConfig.priColor);
+        }
+        return;
     }
 }
 
@@ -34,7 +130,7 @@ static void fn_render() {
 static void fn_font_size_set() {
     int size = dpop();
     if (size < 1) size = 1;
-    if (size > 3) size = 3;
+    if (size > 11) size = 11;
     _currentFontSize = size;
 }
 
@@ -90,21 +186,7 @@ static void fn_write_line() {
         buf[draw_len] = '\0';
 
         tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
-
-        if (_currentFontSize == 2) {
-            // Render using custom 8x12 monospaced bitmap font transparently
-            for (int i = 0; i < draw_len; i++) {
-                char c = buf[i];
-                if (c < 32 || c > 126) c = '?';
-                const uint8_t *glyph = font8x12[c - 32];
-                tft.drawXBitmap(i * 8, y_pixel, glyph, 8, 12, bruceConfig.priColor);
-            }
-        } else {
-            tft.setTextFont(1);
-            tft.setTextSize((_currentFontSize == 3) ? 2 : 1);
-            tft.setCursor(0, y_pixel);
-            tft.print(buf);
-        }
+        drawTextLine(buf, draw_len, 0, y_pixel, char_w);
     }
 }
 
@@ -114,7 +196,7 @@ static void fn_draw_cursor() {
 
     int char_w, char_h;
     getCharDimensions(_currentFontSize, char_w, char_h);
-    int cursor_h = (_currentFontSize == 3) ? 4 : 2;
+    int cursor_h = (char_h >= 36) ? 4 : ((char_h >= 24) ? 3 : 2);
 
     int y_pixel = y * char_h;
     tft.fillRect(x * char_w, y_pixel + char_h - cursor_h, char_w, cursor_h, bruceConfig.priColor);
@@ -169,18 +251,8 @@ static void fn_write_line_ml() {
             buf[0] = '\0';
         }
 
-        if (_currentFontSize == 2) {
-            for (int i = 0; i < chunk_len; i++) {
-                char c = buf[i];
-                if (c < 32 || c > 126) c = '?';
-                const uint8_t *glyph = font8x12[c - 32];
-                tft.drawXBitmap(i * 8, cur_y, glyph, 8, 12, bruceConfig.priColor);
-            }
-        } else {
-            tft.setTextFont(1);
-            tft.setTextSize((_currentFontSize == 3) ? 2 : 1);
-            tft.setCursor(0, cur_y);
-            tft.print(buf);
+        if (chunk_len > 0) {
+            drawTextLine(buf, chunk_len, 0, cur_y, char_w);
         }
 
         cur_y += char_h;
